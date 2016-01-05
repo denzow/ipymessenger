@@ -1,2 +1,3 @@
 # ipymessenger
-IP messenger via python library
+
+It's not work.
