@@ -13,12 +13,14 @@ if __name__ == "__main__":
     ip = IpmsgServer("denzow", "ymsft_group", 2722)
     try:
         ip.start()
+        """
         hello_no = ip.send_message(dest_host, "hello")
         hello2_no = ip.send_message(dest_host, "hello2")
         # 10s wait
         time.sleep(10)
         print("hello is success:" + str(ip.check_sended_message(hello_no)))
         print("hello2 is success:" + str(ip.check_sended_message(hello2_no)))
+        """
         time.sleep(100)
 
     except Exception as e:

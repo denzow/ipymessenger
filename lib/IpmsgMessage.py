@@ -2,7 +2,7 @@
 # coding:utf-8
 from __future__ import print_function, unicode_literals
 from socket import gethostname
-import lib.consts as c
+from lib.consts import command_const as c
 
 
 class IpmsgMessage(object):
@@ -10,7 +10,9 @@ class IpmsgMessage(object):
     def __init__(self, addr, port, message, packet_no, username, hostname=None, command=None):
         self.addr = addr
         self.port = port
-        self.message = message
+        # message must be end with \00
+        self.message = message.rstrip("\00")+"\00"
+
         self.packet_no = packet_no
         self.username = username
         self.command = 0x0
@@ -65,6 +67,22 @@ class IpmsgMessage(object):
 
     def is_ansentry(self):
         return self.is_type(c.IPMSG_ANSENTRY)
+
+    def is_okgetlist(self):
+        return self.is_type(c.IPMSG_OKGETLIST)
+
+    def is_getlist(self):
+        return self.is_type(c.IPMSG_GETLIST)
+
+    def check_flag(self):
+        ret = []
+        ci = c()
+        consts = [ x for x in dir(ci) if "__" not in x]
+        for const in consts:
+            if self.is_type(ci.__getattribute__(const)):
+                ret.append(const)
+
+        return ret
 
 
 
