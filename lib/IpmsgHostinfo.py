@@ -27,7 +27,7 @@ class IpmsgHostinfo(object):
             self.group
         )
 
-def IpmsgHostinfoParser(hostlist_str):
+def IpmsgHostinfoListParser(hostlist_str):
     """
     0\x07    2\x07
     Administrator-<327dac447c87a917>\x07SLOPE\x07232783872\x07192.168.26.189\x0741482\x07slope\x0722\x07
@@ -44,7 +44,18 @@ def IpmsgHostinfoParser(hostlist_str):
     return begein_no, host_count, host_list
 
 
-
+def IpmsgHostinfoParser(normal_message_inst):
+    #user_name, host_name, command, addr, port, nick_name, group):
+    info = IpmsgHostinfo(
+        normal_message_inst.username,
+        normal_message_inst.hostname,
+        normal_message_inst.command,
+        normal_message_inst.addr,
+        normal_message_inst.port,
+        normal_message_inst.username, #TODO username = nickname ? but normal message have one name.
+        None
+    )
+    return info
 
 if __name__ == "__main__":
     getlist_msg = "    0\x07    2\x07Administrator-<327dac447c87a917>\x07SLOPE\x07232783872\x07192.168.26.189\x0741482\x07slope\x0722\x07denzow\x07B1308-66-01\x070\x07192.168.24.97\x0741482\x07denzow\x07ymsft_group\x07\x00"

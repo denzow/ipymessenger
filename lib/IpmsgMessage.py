@@ -74,7 +74,14 @@ class IpmsgMessage(object):
     def is_getlist(self):
         return self.is_type(c.IPMSG_GETLIST)
 
+    def is_br_entry(self):
+        return self.is_type(c.IPMSG_BR_ENTRY)
+
     def check_flag(self):
+        """
+        main reason. for debug.
+        :return:
+        """
         ret = []
         ci = c()
         consts = [ x for x in dir(ci) if "__" not in x]
@@ -83,8 +90,6 @@ class IpmsgMessage(object):
                 ret.append(const)
 
         return ret
-
-
 
     def __repr__(self):
         return self.get_full_message()

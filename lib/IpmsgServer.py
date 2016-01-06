@@ -11,7 +11,7 @@ import time
 import random
 import datetime
 from lib.IpmsgMessage import IpmsgMessage, IpmsgMessageParser
-from lib.IpmsgHostinfo import IpmsgHostinfo, IpmsgHostinfoParser
+from lib.IpmsgHostinfo import IpmsgHostinfo, IpmsgHostinfoListParser, IpmsgHostinfoParser
 
 """
 TODO
@@ -73,7 +73,7 @@ class IpmsgServer(threading.Thread):
         print("Start listen.")
         while not self.stop_event.is_set():
             r, w, e = select.select([self.sock], [self.sock], [], 0)
-            time.sleep(1)
+            time.sleep(0.1)
             # print((r, w, e))
             # recive message
             for sk in r:
@@ -142,7 +142,6 @@ class IpmsgServer(threading.Thread):
         """
         return self.host_list_dict.get(nickname, None)
 
-
     #########################
     # ACTION LIST
     #########################
@@ -154,7 +153,7 @@ class IpmsgServer(threading.Thread):
         """
         print("from[%s:%s]" % (ip_msg.addr, ip_msg.port))
         # TODO debug
-        [print(x) for x in ip_msg.check_flag()]
+        [print("\t"+x) for x in ip_msg.check_flag()]
 
         # TODO consider duplicate flag action
         if ip_msg.is_recvmsg():
@@ -166,13 +165,22 @@ class IpmsgServer(threading.Thread):
         if ip_msg.is_getlist():
             self.getlist_action(ip_msg)
 
+        # br_entry's ans entry must be ignore.9
+        # another client to  i'm online too.
+        if ip_msg.is_br_entry() and not ip_msg.is_ansentry():
+            self.br_entry_action(ip_msg)
+
         # okgetlist message have getlist flag too.
         # so if both flag set, ignore.
+        # avoid loop getlist <-> okgetlist
         if ip_msg.is_okgetlist() and not ip_msg.is_getlist():
             self.okgetlist_action(ip_msg)
 
         else:
             self.default_action(ip_msg)
+
+        # if recv message any host, should be register host.
+        self._add_host_list(IpmsgHostinfoParser(ip_msg))
 
     def default_action(self, msg):
         """
@@ -192,21 +200,20 @@ class IpmsgServer(threading.Thread):
         for s_msg in self.sended_que:
 
             if s_msg.packet_no == msg.message.rstrip("\00"):
-                print("send success:" + s_msg.get_full_message())
+                # print("send success:" + s_msg.get_full_message())
                 self.sended_que.remove(s_msg)
                 break
 
     def ansentry_action(self, msg):
         """
         ansentry is response for brentry
+        add host_list
 
         :param msg:
         :return:
         """
-        # TODO
-        # add hostlist
-        print("ansentry:" + msg.get_full_message().__repr__())
-
+        pass
+        #print("ansentry:" + msg.get_full_message().__repr__())
 
     def okgetlist_action(self, msg):
         """
@@ -215,9 +222,8 @@ class IpmsgServer(threading.Thread):
         :param msg:
         :return:
         """
-        # TODO
         # add hostlist
-        print("okgetlist:" + msg.get_full_message())
+        #print("okgetlist:" + msg.get_full_message())
         # "1:100:sender:sender-pc:18:0"
 
         ip_msg = IpmsgMessage(msg.addr, msg.port, "", self._get_packet_no(), self.user_name)
@@ -234,9 +240,23 @@ class IpmsgServer(threading.Thread):
         """
         #print("getlist:" + msg.get_full_message().__repr__())
         print("getlist")
-        begin_no, host_count, host_list = IpmsgHostinfoParser(msg.get_full_message())
+        begin_no, host_count, host_list = IpmsgHostinfoListParser(msg.get_full_message())
         for host in host_list:
-            self.host_list_dict[host.nick_name] = host
+            self._add_host_list(host)
+
+    def br_entry_action(self, msg):
+        """
+        if recv br_entry, must be send ansentry.
+        and add host_list
+        # 1:1452074470:Administrator-<848363a9d00e6944>:YAMADROID2003:224399361:YAMADROID2003\x00\x00\nUN\x00
+        :param msg:
+        :return:
+        """
+        print("br_entry:" + msg.get_full_message().__repr__())
+        ip_msg = IpmsgMessage(msg.addr, msg.port, "", self._get_packet_no(), self.user_name)
+        ip_msg.set_flag(c.IPMSG_ANSENTRY)
+        self._send(ip_msg)
+
 
     ####################
     # INTERNAL METHOD
@@ -276,3 +296,11 @@ class IpmsgServer(threading.Thread):
     def _send(self, ip_msg):
         self.send_que.append(ip_msg)
 
+    def _add_host_list(self, host_info):
+        """
+        append host info
+        nick_name must be uniq.
+        :param host_info:
+        :return:
+        """
+        self.host_list_dict[host_info.nick_name] = host_info
