@@ -23,7 +23,7 @@ class IpmsgServer(threading.Thread):
 
     src_host = "0.0.0.0"
 
-    def __init__(self, user_name, group_name, use_port):
+    def __init__(self, user_name, group_name, use_port=2524):
         """
 
         :param user_name: for send message and hostlist
