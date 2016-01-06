@@ -11,7 +11,9 @@ class IpmsgMessage(object):
         self.addr = addr
         self.port = port
         # message must be end with \00
-        self.message = message.rstrip("\00")+"\00"
+        self.message = (message.rstrip("\00")+"\00")
+        # : is special character for ipmsg protocol so replace.
+        self.message = self.message.replace(":",";")
 
         self.packet_no = packet_no
         self.username = username
@@ -21,10 +23,14 @@ class IpmsgMessage(object):
         self.hostname = gethostname()
         if hostname:
             self.hostname = hostname
+
+        self.encode = "sjis"
+        # for manage limit dead
         self.born_time = None
 
     def get_full_message(self):
         # Ver(1) : Packet No : MyUserName : MyHostName : Command : msg
+
         ret_msg = "1:%s:%s:%s:%s:%s" % (
             self.packet_no,
             self.username,
@@ -32,7 +38,18 @@ class IpmsgMessage(object):
             self.command,
             self.message
         )
+        return ret_msg.encode(self.encode)
 
+    def get_full_unicode_message(self):
+        # Ver(1) : Packet No : MyUserName : MyHostName : Command : msg
+
+        ret_msg = "1:%s:%s:%s:%s:%s" % (
+            self.packet_no,
+            self.username,
+            self.hostname,
+            self.command,
+            self.message
+        )
         return ret_msg
 
     def set_flag(self, flag):
@@ -43,7 +60,10 @@ class IpmsgMessage(object):
         this message is sendmessage
         :return:
         """
-        self.command = 8405280
+        #self.command = 8405280
+        self.set_flag(c.IPMSG_SENDCHECKOPT)
+        self.set_flag(c.IPMSG_SENDMSG)
+
 
     def set_ansentry(self):
         self.set_flag(c.IPMSG_ANSENTRY)
@@ -95,7 +115,7 @@ class IpmsgMessage(object):
         return self.get_full_message()
 
     def __unicode__(self):
-        return self.get_full_message()
+        return self.get_full_unicode_message()
 
     def __str__(self):
         return self.get_full_message()

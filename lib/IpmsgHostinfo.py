@@ -17,7 +17,18 @@ class IpmsgHostinfo(object):
         self.group = group
 
     def __str__(self):
-        return "%s:%s:%s:%s:%s:%s:%s" % (
+        return ("IpmsgHostinfo:%s:%s:%s:%s:%s:%s:%s" % (
+            self.user_name,
+            self.host_name,
+            self.command,
+            self.addr,
+            self.port,
+            self.nick_name,
+            self.group
+        )).encode("utf-8")
+
+    def __unicode__(self):
+        return "IpmsgHostinfo:%s:%s:%s:%s:%s:%s:%s" % (
             self.user_name,
             self.host_name,
             self.command,
@@ -26,6 +37,18 @@ class IpmsgHostinfo(object):
             self.nick_name,
             self.group
         )
+
+    def __repr__(self):
+        return "IpmsgHostinfo:%s:%s:%s:%s:%s:%s:%s" % (
+            self.user_name,
+            self.host_name,
+            self.command,
+            self.addr,
+            self.port,
+            self.nick_name,
+            self.group
+        )
+
 
 def IpmsgHostinfoListParser(hostlist_str):
     """

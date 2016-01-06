@@ -12,6 +12,7 @@ import random
 import datetime
 from lib.IpmsgMessage import IpmsgMessage, IpmsgMessageParser
 from lib.IpmsgHostinfo import IpmsgHostinfo, IpmsgHostinfoListParser, IpmsgHostinfoParser
+import lib.common as com
 
 """
 TODO
@@ -80,7 +81,7 @@ class IpmsgServer(threading.Thread):
                 data, (ip, port) = sk.recvfrom(0x80000)
                 # parse message
                 # todo check encoding
-                ip_msg = IpmsgMessageParser(ip, port, data.decode("utf-8", "ignore"))
+                ip_msg = IpmsgMessageParser(ip, port, com.to_unicode(data))
                 # action for command
                 result = self.dispatch_action(ip_msg)
 
@@ -89,6 +90,7 @@ class IpmsgServer(threading.Thread):
                 while self.send_que:
                     send_msg = self.send_que.pop()
                     print("To[%s:%s]" % (send_msg.addr, send_msg.port))
+                    [print("\t"+x) for x in send_msg.check_flag()]
                     print(send_msg.get_full_message())
                     self.sock.sendto(send_msg.get_full_message(), (send_msg.addr, send_msg.port))
 
@@ -119,7 +121,7 @@ class IpmsgServer(threading.Thread):
         # Ver(1) : Packet No : MyUserName : MyHostName : Command : Extra
         packet_no = self._get_packet_no()
         # socket data must non unicode.
-        ip_msg = IpmsgMessage(to_addr, self.use_port, msg.encode("utf-8"), packet_no, self.user_name)
+        ip_msg = IpmsgMessage(to_addr, self.use_port, msg, packet_no, self.user_name)
         ip_msg.set_sendmsg()
         self._send(ip_msg)
 
@@ -188,7 +190,7 @@ class IpmsgServer(threading.Thread):
         :param msg:
         :return:
         """
-        print("default:" + msg.get_full_message())
+        print("default:" + msg.get_full_unicode_message())
 
     def recvmsg_action(self, msg):
         """
@@ -196,7 +198,7 @@ class IpmsgServer(threading.Thread):
         を入れます。受信側は、IPMSG_SENDCHECKOPT が立っている場合に限り、
         IPMSG_RECVMSG を返します。拡張部には元のパケット番号を入れます。
         """
-        print("recvmsg:" + msg.get_full_message())
+        print("recvmsg:" + msg.get_full_unicode_message())
         for s_msg in self.sended_que:
 
             if s_msg.packet_no == msg.message.rstrip("\00"):
@@ -240,7 +242,7 @@ class IpmsgServer(threading.Thread):
         """
         #print("getlist:" + msg.get_full_message().__repr__())
         print("getlist")
-        begin_no, host_count, host_list = IpmsgHostinfoListParser(msg.get_full_message())
+        begin_no, host_count, host_list = IpmsgHostinfoListParser(msg.get_full_unicode_message())
         for host in host_list:
             self._add_host_list(host)
 
@@ -271,7 +273,7 @@ class IpmsgServer(threading.Thread):
         #send_msg = "1:%s:sayamada:B1308-66-01:%d:sayamada\00sayamada_group\00" % (self.get_packet_no(), command)
         send_msg = "%s\00%s\00" % (self.user_name, self.group_name)
 
-        ip_msg = IpmsgMessage("255.255.255.255", self.use_port, send_msg.encode("utf-8"), self._get_packet_no(), self.user_name)
+        ip_msg = IpmsgMessage("255.255.255.255", self.use_port, send_msg, self._get_packet_no(), self.user_name)
         ip_msg.set_flag(c.IPMSG_BR_ENTRY)
         # todo it's must be broadcast addr
         self._send(ip_msg)

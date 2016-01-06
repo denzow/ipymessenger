@@ -30,6 +30,10 @@ ip.check_sended_message(packet_no)
 testusers_info = ip.get_hostinfo_by_nickname("testuser")
 packet_no = ip.send_message(testusers_info.addr, "hello")
 
+# stop server
+# wait stop thread and close socket.
+ip.stop()
+
 ```
 
 
