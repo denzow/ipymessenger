@@ -11,6 +11,7 @@ import time
 import random
 import datetime
 from lib.IpmsgMessage import IpmsgMessage, IpmsgMessageParser
+from lib.IpmsgHostinfo import IpmsgHostinfo, IpmsgHostinfoParser
 
 """
 TODO
@@ -52,37 +53,16 @@ class IpmsgServer(threading.Thread):
         self.sended_que = deque()
 
         # initialize hostlist
-        # ユーザ名:ホスト名:コマンド番号:IP アドレス:ポート番号（リトルエンディアン）:ニックネーム:グループ名
-        self.host_list = {}
+        # {
+        #   denzow: HostInfo(osuser:B1308-66-01:0:192.168.24.97:41482:denzow:ymsft_group),
+        #   :
+        # }
+        self.host_list_dict = {}
 
         # say hello
         self._entry()
-        # self._get_host_list()
-
-
-    def _entry(self):
-        """
-        join ipmsg network
-        send BR_ENTRY
-        """
-        # Ver(1) : Packet番号 : 自User名 : 自Host名 : Command番号 : 追加部
-        #send_msg = "1:%s:sayamada:B1308-66-01:%d:sayamada\00sayamada_group\00" % (self.get_packet_no(), command)
-        send_msg = "%s\00%s\00" % (self.user_name, self.group_name)
-
-        ip_msg = IpmsgMessage("255.255.255.255", self.use_port, send_msg.encode("utf-8"), self.get_packet_no(), self.user_name)
-        ip_msg.set_flag(c.IPMSG_BR_ENTRY)
-        # todo it's must be broadcast addr
-        self._send(ip_msg)
-        #self.sock.sendto(send_msg.encode("utf-8"), ("255.255.255.255", self.use_port))
-        # it is for test.
-        # self.sock.sendto(send_msg.encode("utf-8"), (self.dest_host, self.use_port))
-
-    def _get_host_list(self):
-        #1:801798212:root:falcon:6291480:(\00)
-        ip_msg = IpmsgMessage("255.255.255.255", self.use_port, "", self.get_packet_no(), self.user_name)
-        ip_msg.set_flag(c.IPMSG_BR_ISGETLIST2)
-        self._send(ip_msg)
-
+        # please hostlist
+        self._request_host_list()
 
 
     def run(self):
@@ -121,6 +101,9 @@ class IpmsgServer(threading.Thread):
         self.sock.close()
         print("closed socket")
 
+    #########################
+    # PUBLIC METHOD
+    #########################
     def stop(self):
         """
         stop ipmessenger thread
@@ -128,23 +111,19 @@ class IpmsgServer(threading.Thread):
         """
         self.stop_event.set()
 
-    def _send(self, ip_msg):
-        self.send_que.append(ip_msg)
-
-
     def send_message(self, to_addr, msg):
         """
         add send message to send_q
         :return: packet no because check send success or fail.
         """
         # Ver(1) : Packet No : MyUserName : MyHostName : Command : Extra
-        packet_no = self.get_packet_no()
+        packet_no = self._get_packet_no()
         # socket data must non unicode.
         ip_msg = IpmsgMessage(to_addr, self.use_port, msg.encode("utf-8"), packet_no, self.user_name)
         ip_msg.set_sendmsg()
         self._send(ip_msg)
 
-
+        # for follow send status. so return packet no.
         return packet_no
 
     def check_sended_message(self, packet_no):
@@ -155,14 +134,18 @@ class IpmsgServer(threading.Thread):
         """
         return not (packet_no in [x.packet_no for x in self.sended_que])
 
-    def get_packet_no(self):
+    def get_hostinfo_by_nickname(self, nickname):
         """
-        get packet no
+        if the nick_name's info is not exist, return None.
+        :param nickname:
+        :return:
         """
-        self.packet_no += 1
-        # msg is not int. must be str
-        return unicode(self.packet_no)
+        return self.host_list_dict.get(nickname, None)
 
+
+    #########################
+    # ACTION LIST
+    #########################
     def dispatch_action(self, ip_msg):
         """
         dispatch action by
@@ -170,8 +153,10 @@ class IpmsgServer(threading.Thread):
         :return:
         """
         print("from[%s:%s]" % (ip_msg.addr, ip_msg.port))
+        # TODO debug
         [print(x) for x in ip_msg.check_flag()]
 
+        # TODO consider duplicate flag action
         if ip_msg.is_recvmsg():
             self.recvmsg_action(ip_msg)
 
@@ -181,7 +166,9 @@ class IpmsgServer(threading.Thread):
         if ip_msg.is_getlist():
             self.getlist_action(ip_msg)
 
-        if ip_msg.is_okgetlist():
+        # okgetlist message have getlist flag too.
+        # so if both flag set, ignore.
+        if ip_msg.is_okgetlist() and not ip_msg.is_getlist():
             self.okgetlist_action(ip_msg)
 
         else:
@@ -233,9 +220,59 @@ class IpmsgServer(threading.Thread):
         print("okgetlist:" + msg.get_full_message())
         # "1:100:sender:sender-pc:18:0"
 
-        ip_msg = IpmsgMessage(msg.addr, msg.port, "", self.get_packet_no(), self.user_name)
+        ip_msg = IpmsgMessage(msg.addr, msg.port, "", self._get_packet_no(), self.user_name)
         ip_msg.set_flag(c.IPMSG_GETLIST)
         self._send(ip_msg)
 
     def getlist_action(self, msg):
-        print("getlist:" + msg.get_full_message().__repr__())
+        """
+        when get hostlist then register self.host_list_dict
+        host_list key is nick_name.
+
+        :param msg:
+        :return:
+        """
+        #print("getlist:" + msg.get_full_message().__repr__())
+        print("getlist")
+        begin_no, host_count, host_list = IpmsgHostinfoParser(msg.get_full_message())
+        for host in host_list:
+            self.host_list_dict[host.nick_name] = host
+
+    ####################
+    # INTERNAL METHOD
+    #####################
+
+    def _entry(self):
+        """
+        join ipmsg network
+        send BR_ENTRY
+        """
+        # Ver(1) : Packet番号 : 自User名 : 自Host名 : Command番号 : 追加部
+        #send_msg = "1:%s:sayamada:B1308-66-01:%d:sayamada\00sayamada_group\00" % (self.get_packet_no(), command)
+        send_msg = "%s\00%s\00" % (self.user_name, self.group_name)
+
+        ip_msg = IpmsgMessage("255.255.255.255", self.use_port, send_msg.encode("utf-8"), self._get_packet_no(), self.user_name)
+        ip_msg.set_flag(c.IPMSG_BR_ENTRY)
+        # todo it's must be broadcast addr
+        self._send(ip_msg)
+        #self.sock.sendto(send_msg.encode("utf-8"), ("255.255.255.255", self.use_port))
+        # it is for test.
+        # self.sock.sendto(send_msg.encode("utf-8"), (self.dest_host, self.use_port))
+
+    def _request_host_list(self):
+        #1:801798212:root:falcon:6291480:(\00)
+        ip_msg = IpmsgMessage("255.255.255.255", self.use_port, "", self._get_packet_no(), self.user_name)
+        ip_msg.set_flag(c.IPMSG_BR_ISGETLIST2)
+        self._send(ip_msg)
+
+    def _get_packet_no(self):
+        """
+        get packet no
+        """
+        self.packet_no += 1
+        # msg is not int. must be str
+        return unicode(self.packet_no)
+
+    def _send(self, ip_msg):
+        self.send_que.append(ip_msg)
+

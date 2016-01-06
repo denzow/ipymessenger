@@ -21,6 +21,10 @@ if __name__ == "__main__":
         print("hello is success:" + str(ip.check_sended_message(hello_no)))
         print("hello2 is success:" + str(ip.check_sended_message(hello2_no)))
         """
+        time.sleep(10)
+        print(ip.get_hostinfo_by_nickname("denzow"))
+        print(ip.get_hostinfo_by_nickname("slope"))
+
         time.sleep(100)
 
     except Exception as e:
