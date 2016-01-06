@@ -19,6 +19,7 @@ class IpmsgMessage(object):
         self.hostname = gethostname()
         if hostname:
             self.hostname = hostname
+        self.born_time = None
 
     def get_full_message(self):
         # Ver(1) : Packet No : MyUserName : MyHostName : Command : msg
@@ -32,12 +33,18 @@ class IpmsgMessage(object):
 
         return ret_msg
 
+    def set_flag(self, flag):
+        self.command |= flag
+
     def set_sendmsg(self):
         """
         this message is sendmessage
         :return:
         """
         self.command = 8405280
+
+    def set_ansentry(self):
+        self.set_flag(c.IPMSG_ANSENTRY)
 
     def is_type(self, flag):
         """
@@ -55,6 +62,10 @@ class IpmsgMessage(object):
 
     def is_recvmsg(self):
         return self.is_type(c.IPMSG_RECVMSG)
+
+    def is_ansentry(self):
+        return self.is_type(c.IPMSG_ANSENTRY)
+
 
 
     def __repr__(self):
@@ -83,13 +94,12 @@ def IpmsgMessageParser(addr, port, msg_str):
     hostname = attr_list[3]
     command = attr_list[4]
     message = attr_list[5]
-    print(attr_list)
 
     return IpmsgMessage(
         addr,
         port,
         message,
-        int(packet_no),
+        packet_no,
         username,
         hostname,
         command
