@@ -97,6 +97,13 @@ class IpmsgMessage(object):
     def is_br_entry(self):
         return self.is_type(c.IPMSG_BR_ENTRY)
 
+    def is_sendmsg(self):
+        return self.is_type(c.IPMSG_SENDMSG)
+
+    def is_sendcheckopt(self):
+        return self.is_type(c.IPMSG_SENDCHECKOPT)
+
+
     def check_flag(self):
         """
         main reason. for debug.

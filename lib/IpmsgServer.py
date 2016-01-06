@@ -178,8 +178,11 @@ class IpmsgServer(threading.Thread):
         if ip_msg.is_okgetlist() and not ip_msg.is_getlist():
             self.okgetlist_action(ip_msg)
 
-        else:
-            self.default_action(ip_msg)
+        # receive message from other host sended.
+        if ip_msg.is_sendmsg():
+            self.sendmsg_action(ip_msg)
+
+        self.default_action(ip_msg)
 
         # if recv message any host, should be register host.
         self._add_host_list(IpmsgHostinfoParser(ip_msg))
@@ -258,6 +261,19 @@ class IpmsgServer(threading.Thread):
         ip_msg = IpmsgMessage(msg.addr, msg.port, "", self._get_packet_no(), self.user_name)
         ip_msg.set_flag(c.IPMSG_ANSENTRY)
         self._send(ip_msg)
+
+    def sendmsg_action(self, msg):
+        """
+        recv message action
+        :param msg:
+        :return:
+        """
+        print("sendmsg:" + msg.get_full_unicode_message())
+        if msg.is_sendcheckopt():
+            ip_msg = IpmsgMessage(msg.addr, msg.port, msg.packet_no, self._get_packet_no(), self.user_name)
+            ip_msg.set_flag(c.IPMSG_RECVMSG)
+            self._send(ip_msg)
+
 
 
     ####################
