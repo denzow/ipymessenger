@@ -39,7 +39,7 @@ ip.stop()
 
 ## TODO
 
-* fail message's ageout
 * send SECRET message
 * recv SECRET message
 * register hostinfo correctry other than via getlist
+* debug message not must be print but logger

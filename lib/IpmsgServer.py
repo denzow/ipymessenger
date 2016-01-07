@@ -5,6 +5,8 @@ from __future__ import print_function, unicode_literals
 import select
 import socket
 import threading
+import sys
+import traceback
 from lib.consts import command_const as c
 from collections import deque
 import time
@@ -22,7 +24,7 @@ class IpmsgServer(threading.Thread):
 
     src_host = "0.0.0.0"
     # TODO
-    sended_que_life_time = 200
+    sended_que_life_time = 30
 
     def __init__(self, user_name, group_name, use_port=2524):
         """
@@ -73,42 +75,56 @@ class IpmsgServer(threading.Thread):
         """
         print("Start listen.")
         # main loop
-        while not self.stop_event.is_set():
-            r, w, e = select.select([self.sock], [self.sock], [], 0)
-            time.sleep(0.1)
-            # print((r, w, e))
-            # recive message
-            for sk in r:
-                data, (ip, port) = sk.recvfrom(0x80000)
-                # parse message
-                ip_msg = IpmsgMessageParser(ip, port, com.to_unicode(data))
-                # action for command
-                self.dispatch_action(ip_msg)
+        try:
+            while not self.stop_event.is_set():
+                r, w, e = select.select([self.sock], [self.sock], [], 0)
+                time.sleep(0.1)
+                # print((r, w, e))
+                # recive message
+                for sk in r:
+                    data, (ip, port) = sk.recvfrom(0x80000)
+                    # parse message
+                    ip_msg = IpmsgMessageParser(ip, port, com.to_unicode(data))
+                    # action for command
+                    self.dispatch_action(ip_msg)
 
-            # send message
-            if w and self.send_que:
-                while self.send_que:
-                    send_msg = self.send_que.popleft()
-                    print("To[%s:%s]" % (send_msg.addr, send_msg.port))
-                    [print("\t"+x) for x in send_msg.check_flag()]
-                    print(send_msg.get_full_message())
-                    self.sock.sendto(send_msg.get_full_message(), (send_msg.addr, send_msg.port))
+                # send message
+                if w and self.send_que:
+                    while self.send_que:
+                        send_msg = self.send_que.popleft()
+                        print("To[%s:%s]" % (send_msg.addr, send_msg.port))
+                        [print("\t"+x) for x in send_msg.check_flag()]
+                        print(send_msg.get_full_message())
+                        self.sock.sendto(send_msg.get_full_message(), (send_msg.addr, send_msg.port))
 
-                    if send_msg.is_sendmsg():
-                        # for check sendmsg success
-                        # if long time in the sended que, the message must be failed.
-                        send_msg.born_time = datetime.datetime.now()
-                        self.sended_que.append(send_msg)
+                        if send_msg.is_sendmsg():
+                            # for check sendmsg success
+                            # if long time in the sended que, the message must be failed.
+                            send_msg.born_time = datetime.datetime.now()
+                            self.sended_que.append(send_msg)
 
-            self._cleanup_ques()
+                self._cleanup_ques()
+        except Exception as e:
+            error_args = sys.exc_info()
+            print(traceback.print_tb(error_args[2]))
+            print(e)
 
         # close socket before ipmsg thread end
         self.sock.close()
+        self.sock = None
         print("closed socket")
 
     #########################
     # PUBLIC METHOD
     #########################
+    def is_valid(self):
+        """
+        server is running.
+        :return:
+        """
+        return not (self.sock is None)
+
+
     def stop(self):
         """
         stop ipmessenger thread
@@ -131,9 +147,30 @@ class IpmsgServer(threading.Thread):
         # for follow send status. so return packet no.
         return packet_no
 
+    def send_message_by_nickname(self, nickname, msg):
+        """
+        search addr by nickname
+        and
+        add send message to send_q
+        :return: packet no because check send success or fail.
+        """
+        # Ver(1) : Packet No : MyUserName : MyHostName : Command : Extra
+
+        host_info = self.get_hostinfo_by_nickname(nickname)
+
+        if host_info:
+            packet_no = self._get_packet_no()
+            ip_msg = IpmsgMessage(host_info.addr, self.use_port, msg, packet_no, self.user_name)
+            ip_msg.set_sendmsg()
+            self._send(ip_msg)
+            # for follow send status. so return packet no.
+            return packet_no
+        else:
+            raise IpmsgException("nickname matched host is not found.")
+
     def check_sended_message(self, packet_no):
         """
-        if the packet no is in sended_que, the message is not success yet.
+        if the packet no is in sended_que and send_que, the message is not success yet.
         :param packet_no:
         :return:
         """
@@ -200,9 +237,11 @@ class IpmsgServer(threading.Thread):
 
     def recvmsg_action(self, msg):
         """
-        メッセージ送信には IPMSG_SENDMSG を使用し、拡張部にメッセージ本体
-        を入れます。受信側は、IPMSG_SENDCHECKOPT が立っている場合に限り、
-        IPMSG_RECVMSG を返します。拡張部には元のパケット番号を入れます。
+        Send message use IPMSG_SENDMSG. if IPMSG_SENDCHECKOPT,
+        receiver return  IPMSG_RECVMSG and same packet_no.
+
+        this case , check sended que and remove target_msg,
+        because the message is success sending.
         """
         print("recvmsg:" + msg.get_full_unicode_message())
         for s_msg in self.sended_que:
@@ -278,8 +317,6 @@ class IpmsgServer(threading.Thread):
             ip_msg.set_flag(c.IPMSG_RECVMSG)
             self._send(ip_msg)
 
-
-
     ####################
     # INTERNAL METHOD
     #####################
@@ -336,4 +373,9 @@ class IpmsgServer(threading.Thread):
             self.sended_que.remove(msg)
 
 
+class IpmsgException(Exception):
+    def __init__(self, message):
+        self.message = message
 
+    def __str__(self):
+        return repr(self.message)
