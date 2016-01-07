@@ -16,9 +16,6 @@ from lib.IpmsgMessage import IpmsgMessage, IpmsgMessageParser
 from lib.IpmsgHostinfo import IpmsgHostinfo, IpmsgHostinfoListParser, IpmsgHostinfoParser
 import lib.common as com
 
-"""
-TODO
-"""
 
 class IpmsgServer(threading.Thread):
 
@@ -90,7 +87,9 @@ class IpmsgServer(threading.Thread):
 
                 # send message
                 if w and self.send_que:
+                    # send message loop until que empty.
                     while self.send_que:
+                        # FIFO
                         send_msg = self.send_que.popleft()
                         print("To[%s:%s]" % (send_msg.addr, send_msg.port))
                         [print("\t"+x) for x in send_msg.check_flag()]
@@ -147,6 +146,14 @@ class IpmsgServer(threading.Thread):
         # for follow send status. so return packet no.
         return packet_no
 
+    def check_sended_message(self, packet_no):
+        """
+        if the packet no is in sended_que and send_que, the message is not success yet.
+        :param packet_no:
+        :return:
+        """
+        return not ((packet_no in [x.packet_no for x in self.sended_que]) or (packet_no in [x.packet_no for x in self.send_que]))
+
     def send_message_by_nickname(self, nickname, msg):
         """
         search addr by nickname
@@ -168,13 +175,40 @@ class IpmsgServer(threading.Thread):
         else:
             raise IpmsgException("nickname matched host is not found.")
 
-    def check_sended_message(self, packet_no):
+    def send_message_by_fuzzy_nickname(self, nickname, msg):
         """
-        if the packet no is in sended_que and send_que, the message is not success yet.
-        :param packet_no:
-        :return:
+        search addr by nickname
+        if nickname's not exist, try to fuzzy search.
+        and
+        add send message to send_q
+        :return: packet no because check send success or fail.
         """
-        return not ((packet_no in [x.packet_no for x in self.sended_que]) or (packet_no in [x.packet_no for x in self.send_que]))
+        # Ver(1) : Packet No : MyUserName : MyHostName : Command : Extra
+        # rule list
+        # (func, name + args)
+        try_rule_list = [
+            (lambda x: x, [nickname]),  # 1st do nothing
+            (com.adjust_name, [nickname, ""]),
+            (com.adjust_name, [nickname, " "]),  # single space
+            (com.adjust_name, [nickname, "  "]),  # double single space
+            (com.adjust_name, [nickname, "　"]),  # multi byte space
+        ]
+        host_info = None
+        for rule_func, rule_arg in try_rule_list:
+            print(rule_func(*rule_arg))
+            host_info = self.get_hostinfo_by_nickname(rule_func(*rule_arg))
+            if host_info:
+                break
+
+        if host_info:
+            packet_no = self._get_packet_no()
+            ip_msg = IpmsgMessage(host_info.addr, self.use_port, msg, packet_no, self.user_name)
+            ip_msg.set_sendmsg()
+            self._send(ip_msg)
+            # for follow send status. so return packet no.
+            return packet_no
+        else:
+            raise IpmsgException("nickname fuzzy matched host is not found.")
 
     def get_hostinfo_by_nickname(self, nickname):
         """
@@ -326,7 +360,7 @@ class IpmsgServer(threading.Thread):
         join ipmsg network
         send BR_ENTRY
         """
-        # Ver(1) : Packet番号 : 自User名 : 自Host名 : Command番号 : 追加部
+        # Ver : PacketNo : User : Host : Command : Msg
         #send_msg = "1:%s:sayamada:B1308-66-01:%d:sayamada\00sayamada_group\00" % (self.get_packet_no(), command)
         send_msg = "%s\00%s\00" % (self.user_name, self.group_name)
 
@@ -349,7 +383,7 @@ class IpmsgServer(threading.Thread):
         get packet no
         """
         self.packet_no += 1
-        # msg is not int. must be str
+        # msg is not int. so packet_no must be str too.
         return unicode(self.packet_no)
 
     def _send(self, ip_msg):

@@ -1,11 +1,18 @@
 #!/usr/bin/env python
 # coding:utf-8
 
+import re
+
 """
 util functions
 """
 
 def to_unicode(string):
+    """
+    avoid decode error.
+    :param string:
+    :return:
+    """
     encode = guess_charset(string)
     try:
         return string.decode(encode)
@@ -14,9 +21,6 @@ def to_unicode(string):
 
 
 def guess_charset(data):
-    # 日本語の主要コーディングで試す
-    # 渡された文字列について、decodeし
-    # 成功したコードを戻す
     try:
         data.decode("utf-8")
         return "utf-8"
@@ -42,3 +46,7 @@ def guess_charset(data):
         return "CP932"
     except:
         return "utf-8"
+
+
+def adjust_name(base_name_str, join_str):
+    return join_str.join(re.split("\s+", base_name_str))
