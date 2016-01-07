@@ -2,7 +2,7 @@
 
 It's not completed.
 
-# how to
+## how to
 
 check sample.py
 
@@ -37,3 +37,9 @@ ip.stop()
 ```
 
 
+## TODO
+
+* fail message's ageout
+* send SECRET message
+* recv SECRET message
+* register hostinfo correctry other than via getlist

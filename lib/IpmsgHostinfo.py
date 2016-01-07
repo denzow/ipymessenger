@@ -47,7 +47,7 @@ class IpmsgHostinfo(object):
             self.port,
             self.nick_name,
             self.group
-        )
+        ).encode("utf-8")
 
 
 def IpmsgHostinfoListParser(hostlist_str):

@@ -15,21 +15,27 @@ if __name__ == "__main__":
         ip.start()
 
         hello_no = ip.send_message(dest_host, "へろー")
-        """
-        hello2_no = ip.send_message(dest_host, "hello2")
+        fail_msg_no = ip.send_message("192.168.26.193", "へろー")
+        ip.send_message("192.168.26.193", "へろー")
+        ip.send_message("192.168.26.193", "へろー")
+        ip.send_message("192.168.26.193", "へろー")
+
+        #hello2_no = ip.send_message(dest_host, "hello2")
         # 10s wait
-        time.sleep(10)
-        """
-        print("hello is success:" + str(ip.check_sended_message(hello_no)))
-        """
-        print("hello2 is success:" + str(ip.check_sended_message(hello2_no)))
-        """
-        time.sleep(10)
-        print(ip.get_hostinfo_by_nickname("denzow"))
-        print(ip.get_hostinfo_by_nickname("slope"))
-        print(ip.get_hostinfo_by_nickname("no user"))
+        #time.sleep(5)
+
+        print("######hello is success:" + str(ip.check_sended_message(hello_no)))
+        print("######fail_msg_no is success:" + str(ip.check_sended_message(fail_msg_no)))
+        # print("hello2 is success:" + str(ip.check_sended_message(hello2_no)))
+
+        time.sleep(5)
+
+        print("######hello is success:" + str(ip.check_sended_message(hello_no)))
+        print("######fail_msg_no is success:" + str(ip.check_sended_message(fail_msg_no)))
+        print(ip.sended_que)
 
         time.sleep(100)
+
 
     except Exception as e:
         print("Exception occured")

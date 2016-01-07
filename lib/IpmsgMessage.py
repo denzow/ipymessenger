@@ -11,7 +11,7 @@ class IpmsgMessage(object):
         self.addr = addr
         self.port = port
         # message must be end with \00
-        self.message = (message.rstrip("\00")+"\00")
+        self.message = message.rstrip("\00")+"\00"
         # : is special character for ipmsg protocol so replace.
         self.message = self.message.replace(":",";")
 
@@ -24,6 +24,7 @@ class IpmsgMessage(object):
         if hostname:
             self.hostname = hostname
 
+        # TODO
         self.encode = "sjis"
         # for manage limit dead
         self.born_time = None
@@ -96,13 +97,6 @@ class IpmsgMessage(object):
 
     def is_br_entry(self):
         return self.is_type(c.IPMSG_BR_ENTRY)
-
-    def is_sendmsg(self):
-        return self.is_type(c.IPMSG_SENDMSG)
-
-    def is_sendcheckopt(self):
-        return self.is_type(c.IPMSG_SENDCHECKOPT)
-
 
     def check_flag(self):
         """

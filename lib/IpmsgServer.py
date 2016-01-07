@@ -16,13 +16,13 @@ import lib.common as com
 
 """
 TODO
-get host list
-check message command info
 """
 
 class IpmsgServer(threading.Thread):
 
     src_host = "0.0.0.0"
+    # TODO
+    sended_que_life_time = 200
 
     def __init__(self, user_name, group_name, use_port=2524):
         """
@@ -72,6 +72,7 @@ class IpmsgServer(threading.Thread):
         :return:
         """
         print("Start listen.")
+        # main loop
         while not self.stop_event.is_set():
             r, w, e = select.select([self.sock], [self.sock], [], 0)
             time.sleep(0.1)
@@ -80,24 +81,26 @@ class IpmsgServer(threading.Thread):
             for sk in r:
                 data, (ip, port) = sk.recvfrom(0x80000)
                 # parse message
-                # todo check encoding
                 ip_msg = IpmsgMessageParser(ip, port, com.to_unicode(data))
                 # action for command
-                result = self.dispatch_action(ip_msg)
+                self.dispatch_action(ip_msg)
 
             # send message
             if w and self.send_que:
                 while self.send_que:
-                    send_msg = self.send_que.pop()
+                    send_msg = self.send_que.popleft()
                     print("To[%s:%s]" % (send_msg.addr, send_msg.port))
                     [print("\t"+x) for x in send_msg.check_flag()]
                     print(send_msg.get_full_message())
                     self.sock.sendto(send_msg.get_full_message(), (send_msg.addr, send_msg.port))
 
-                    # for check send success
-                    send_msg.born_time = datetime.datetime.now()
-                    self.sended_que.append(send_msg)
+                    if send_msg.is_sendmsg():
+                        # for check sendmsg success
+                        # if long time in the sended que, the message must be failed.
+                        send_msg.born_time = datetime.datetime.now()
+                        self.sended_que.append(send_msg)
 
+            self._cleanup_ques()
 
         # close socket before ipmsg thread end
         self.sock.close()
@@ -134,7 +137,7 @@ class IpmsgServer(threading.Thread):
         :param packet_no:
         :return:
         """
-        return not (packet_no in [x.packet_no for x in self.sended_que])
+        return not ((packet_no in [x.packet_no for x in self.sended_que]) or (packet_no in [x.packet_no for x in self.send_que]))
 
     def get_hostinfo_by_nickname(self, nickname):
         """
@@ -167,7 +170,7 @@ class IpmsgServer(threading.Thread):
         if ip_msg.is_getlist():
             self.getlist_action(ip_msg)
 
-        # br_entry's ans entry must be ignore.9
+        # br_entry's ans entry must be ignore.
         # another client to  i'm online too.
         if ip_msg.is_br_entry() and not ip_msg.is_ansentry():
             self.br_entry_action(ip_msg)
@@ -204,6 +207,7 @@ class IpmsgServer(threading.Thread):
         print("recvmsg:" + msg.get_full_unicode_message())
         for s_msg in self.sended_que:
 
+            # packet_no is not endwith \00
             if s_msg.packet_no == msg.message.rstrip("\00"):
                 # print("send success:" + s_msg.get_full_message())
                 self.sended_que.remove(s_msg)
@@ -322,3 +326,14 @@ class IpmsgServer(threading.Thread):
         :return:
         """
         self.host_list_dict[host_info.nick_name] = host_info
+
+    def _cleanup_ques(self):
+
+        now = datetime.datetime.now()
+        aged_out_list = [msg for msg in self.sended_que if (now - msg.born_time) > datetime.timedelta(seconds=self.sended_que_life_time)]
+        for msg in aged_out_list:
+            print("Age out:[%s:%s]" % (msg.packet_no, msg.addr))
+            self.sended_que.remove(msg)
+
+
+
