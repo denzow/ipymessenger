@@ -43,4 +43,3 @@ ip.stop()
 * recv SECRET message
 * register hostinfo correctry other than via getlist
 * remove hostlist when rcv br_exit.
-* debug message not must be print but logger

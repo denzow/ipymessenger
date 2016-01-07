@@ -15,6 +15,14 @@ import datetime
 from lib.IpmsgMessage import IpmsgMessage, IpmsgMessageParser
 from lib.IpmsgHostinfo import IpmsgHostinfo, IpmsgHostinfoListParser, IpmsgHostinfoParser
 import lib.common as com
+from logging import getLogger, StreamHandler, DEBUG
+logger = getLogger(__name__)
+handler = StreamHandler()
+handler.setLevel(DEBUG)
+logger.setLevel(DEBUG)
+logger.addHandler(handler)
+
+
 
 
 class IpmsgServer(threading.Thread):
@@ -64,13 +72,12 @@ class IpmsgServer(threading.Thread):
         # please hostlist
         self._request_host_list()
 
-
     def run(self):
         """
         main function
         :return:
         """
-        print("Start listen.")
+        logger.debug("Start listen.")
         # main loop
         try:
             while not self.stop_event.is_set():
@@ -91,9 +98,9 @@ class IpmsgServer(threading.Thread):
                     while self.send_que:
                         # FIFO
                         send_msg = self.send_que.popleft()
-                        print("To[%s:%s]" % (send_msg.addr, send_msg.port))
-                        [print("\t"+x) for x in send_msg.check_flag()]
-                        print(send_msg.get_full_message())
+                        logger.debug("To[%s:%s]" % (send_msg.addr, send_msg.port))
+                        [logger.debug("\t"+x) for x in send_msg.check_flag()]
+                        logger.debug(send_msg.get_full_message())
                         self.sock.sendto(send_msg.get_full_message(), (send_msg.addr, send_msg.port))
 
                         if send_msg.is_sendmsg():
@@ -105,13 +112,13 @@ class IpmsgServer(threading.Thread):
                 self._cleanup_ques()
         except Exception as e:
             error_args = sys.exc_info()
-            print(traceback.print_tb(error_args[2]))
-            print(e)
+            logger.debug(traceback.print_tb(error_args[2]))
+            logger.debug(e)
 
         # close socket before ipmsg thread end
         self.sock.close()
         self.sock = None
-        print("closed socket")
+        logger.debug("closed socket")
 
     #########################
     # PUBLIC METHOD
@@ -195,7 +202,7 @@ class IpmsgServer(threading.Thread):
         ]
         host_info = None
         for rule_func, rule_arg in try_rule_list:
-            print(rule_func(*rule_arg))
+            logger.debug(rule_func(*rule_arg))
             host_info = self.get_hostinfo_by_nickname(rule_func(*rule_arg))
             if host_info:
                 break
@@ -227,9 +234,9 @@ class IpmsgServer(threading.Thread):
         :param ip_msg:
         :return:
         """
-        print("from[%s:%s]" % (ip_msg.addr, ip_msg.port))
+        logger.debug("from[%s:%s]" % (ip_msg.addr, ip_msg.port))
         # TODO debug
-        [print("\t"+x) for x in ip_msg.check_flag()]
+        [logger.debug("\t"+x) for x in ip_msg.check_flag()]
 
         # TODO consider duplicate flag action
         if ip_msg.is_recvmsg():
@@ -267,7 +274,7 @@ class IpmsgServer(threading.Thread):
         :param msg:
         :return:
         """
-        print("default:" + msg.get_full_unicode_message().__repr__())
+        logger.debug("default:" + msg.get_full_unicode_message().__repr__())
 
     def recvmsg_action(self, msg):
         """
@@ -277,12 +284,12 @@ class IpmsgServer(threading.Thread):
         this case , check sended que and remove target_msg,
         because the message is success sending.
         """
-        print("recvmsg:" + msg.get_full_unicode_message())
+        logger.debug("recvmsg:" + msg.get_full_unicode_message())
         for s_msg in self.sended_que:
 
             # packet_no is not endwith \00
             if s_msg.packet_no == msg.message.rstrip("\00"):
-                # print("send success:" + s_msg.get_full_message())
+                # logger.debug("send success:" + s_msg.get_full_message())
                 self.sended_que.remove(s_msg)
                 break
 
@@ -295,7 +302,7 @@ class IpmsgServer(threading.Thread):
         :return:
         """
         pass
-        #print("ansentry:" + msg.get_full_message().__repr__())
+        #logger.debug("ansentry:" + msg.get_full_message().__repr__())
 
     def okgetlist_action(self, msg):
         """
@@ -305,7 +312,7 @@ class IpmsgServer(threading.Thread):
         :return:
         """
         # add hostlist
-        #print("okgetlist:" + msg.get_full_message())
+        #logger.debug("okgetlist:" + msg.get_full_message())
         # "1:100:sender:sender-pc:18:0"
 
         ip_msg = IpmsgMessage(msg.addr, msg.port, "", self._get_packet_no(), self.user_name)
@@ -320,8 +327,8 @@ class IpmsgServer(threading.Thread):
         :param msg:
         :return:
         """
-        #print("getlist:" + msg.get_full_message().__repr__())
-        print("getlist")
+        #logger.debug("getlist:" + msg.get_full_message().__repr__())
+        logger.debug("getlist")
         begin_no, host_count, host_list = IpmsgHostinfoListParser(msg.get_full_unicode_message())
         for host in host_list:
             self._add_host_list(host)
@@ -334,11 +341,11 @@ class IpmsgServer(threading.Thread):
         :param msg:
         :return:
         """
-        print("br_entry:" + msg.get_full_message().__repr__())
+        logger.debug("br_entry:" + msg.get_full_message().__repr__())
         send_msg = "%s\00%s" % (self.user_name, self.group_name)
         ip_msg = IpmsgMessage(msg.addr, msg.port, send_msg, self._get_packet_no(), self.user_name)
         ip_msg.set_flag(c.IPMSG_ANSENTRY)
-        print("br_entry_re:" + ip_msg.get_full_message().__repr__())
+        logger.debug("br_entry_re:" + ip_msg.get_full_message().__repr__())
         self._send(ip_msg)
 
     def sendmsg_action(self, msg):
@@ -347,7 +354,7 @@ class IpmsgServer(threading.Thread):
         :param msg:
         :return:
         """
-        print("sendmsg:" + msg.get_full_unicode_message())
+        logger.debug("sendmsg:" + msg.get_full_unicode_message())
         if msg.is_sendcheckopt():
             ip_msg = IpmsgMessage(msg.addr, msg.port, msg.packet_no, self._get_packet_no(), self.user_name)
             ip_msg.set_flag(c.IPMSG_RECVMSG)
@@ -401,11 +408,18 @@ class IpmsgServer(threading.Thread):
         self.host_list_dict[host_info.nick_name] = host_info
 
     def _cleanup_ques(self):
+        """
+        old msg discard.
+        * sended_que
+        TODO
+        unread_que
+        :return:
+        """
 
         now = datetime.datetime.now()
         aged_out_list = [msg for msg in self.sended_que if (now - msg.born_time) > datetime.timedelta(seconds=self.sended_que_life_time)]
         for msg in aged_out_list:
-            print("Age out:[%s:%s]" % (msg.packet_no, msg.addr))
+            logger.debug("Age out:[%s:%s]" % (msg.packet_no, msg.addr))
             self.sended_que.remove(msg)
 
 

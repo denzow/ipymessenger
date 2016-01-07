@@ -14,8 +14,11 @@ if __name__ == "__main__":
     try:
         ip.start()
         time.sleep(10)
-        """
         hello_no = ip.send_message(dest_host, "へろー")
+        time.sleep(5)
+
+        print("######hello is success:" + str(ip.check_sended_message(hello_no)))
+        """
         test_no = ip.send_message_by_nickname("slope", "へろー by name")
 
 
