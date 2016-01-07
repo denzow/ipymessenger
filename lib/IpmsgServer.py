@@ -267,7 +267,7 @@ class IpmsgServer(threading.Thread):
         :param msg:
         :return:
         """
-        print("default:" + msg.get_full_unicode_message())
+        print("default:" + msg.get_full_unicode_message().__repr__())
 
     def recvmsg_action(self, msg):
         """
@@ -335,8 +335,10 @@ class IpmsgServer(threading.Thread):
         :return:
         """
         print("br_entry:" + msg.get_full_message().__repr__())
-        ip_msg = IpmsgMessage(msg.addr, msg.port, "", self._get_packet_no(), self.user_name)
+        send_msg = "%s\00%s" % (self.user_name, self.group_name)
+        ip_msg = IpmsgMessage(msg.addr, msg.port, send_msg, self._get_packet_no(), self.user_name)
         ip_msg.set_flag(c.IPMSG_ANSENTRY)
+        print("br_entry_re:" + ip_msg.get_full_message().__repr__())
         self._send(ip_msg)
 
     def sendmsg_action(self, msg):
@@ -362,7 +364,7 @@ class IpmsgServer(threading.Thread):
         """
         # Ver : PacketNo : User : Host : Command : Msg
         #send_msg = "1:%s:sayamada:B1308-66-01:%d:sayamada\00sayamada_group\00" % (self.get_packet_no(), command)
-        send_msg = "%s\00%s\00" % (self.user_name, self.group_name)
+        send_msg = "%s\00%s" % (self.user_name, self.group_name)
 
         ip_msg = IpmsgMessage("255.255.255.255", self.use_port, send_msg, self._get_packet_no(), self.user_name)
         ip_msg.set_flag(c.IPMSG_BR_ENTRY)

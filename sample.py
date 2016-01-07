@@ -32,7 +32,7 @@ if __name__ == "__main__":
         print("test_no is success:" + str(ip.check_sended_message(test_no)))
         print(ip.sended_que)
         """
-        ip.send_message_by_fuzzy_nickname("slope 太郎", "へろー")
+        #ip.send_message_by_fuzzy_nickname("slope 太郎", "へろー")
         time.sleep(100)
 
 
