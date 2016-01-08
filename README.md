@@ -1,14 +1,13 @@
 # ipymessenger
 
-Send message via [IP messenger](http://ipmsg.org/) Protocol
-ipymessenger is easy to use and work any platform(maybe).
+Pythonで[IP messenger](http://ipmsg.org/) を使うためのライブラリです。
+そのうちPyPIにも登録したいですがまだです。
 
-**It's not completed.but some method work.**
-** 動くけど多分Bugある気がします **
+ライブりとして組み込んで使用することを想定しています。
 
 ## how to use
 
-check sample.py
+ sample.py からお察しください。
 
 ```python
 from IpmsgServer import IpmsgServer
@@ -16,7 +15,7 @@ from IpmsgServer import IpmsgServer
 # username, group name, port(default 2524)
 ip = IpmsgServer("denzow", "denzow_group", 2721)
 
-# start (it's threading)
+# サーバスタート
 ip.start()
 
 # send message
@@ -53,11 +52,11 @@ ip.stop()
 #
 ```
 
-## restriction
+## 制限事項
 
-* can not send attach file.
-* can not send encrypted message.
-* no way to send secret message yet.
+* 添付ファイルつかえません
+* 暗号化はできません
+* (まだ)受け取ったメッセージは標準出力に書き出すだけです
 
 ## TODO
 
