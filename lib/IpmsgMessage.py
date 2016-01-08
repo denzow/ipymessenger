@@ -2,6 +2,7 @@
 # coding:utf-8
 from __future__ import print_function, unicode_literals
 from socket import gethostname
+import datetime
 from lib.consts import command_const as c
 
 
@@ -111,6 +112,13 @@ class IpmsgMessage(object):
                 ret.append(const)
 
         return ret
+
+    def born_now(self):
+        """
+        メッセージに誕生日を付与する
+        :return:
+        """
+        self.born_time = datetime.datetime.now()
 
     def __repr__(self):
         return self.get_full_message()

@@ -29,6 +29,7 @@ class IpmsgServer(threading.Thread):
     version = "0.1"
     # TODO
     sended_que_life_time = 30
+    received_que_life_time = 100
 
     def __init__(self, user_name, group_name, use_port=2524):
         """
@@ -60,6 +61,10 @@ class IpmsgServer(threading.Thread):
         self.send_que = deque()
         # recvmsgパケットが届くのをまっているメッセージを格納するキュー
         self.sended_que = deque()
+        # sendmsgで受け取ったキュー
+        # 受信箱
+        self.received_que = deque()
+
 
         # メンバーリストはニックネームをキーとする
         # {
@@ -109,7 +114,7 @@ class IpmsgServer(threading.Thread):
                             # sendmsgのメッセージだけがrecvmsgによる受信確認が必要なので
                             # 格納しておく
                             # ただ、recvmsgをいつまでも保持したくないのでエージアウト用に時間を記録する
-                            send_msg.born_time = datetime.datetime.now()
+                            send_msg.born_now()
                             self.sended_que.append(send_msg)
                 # メッセージキューのメンテナンス
                 self._cleanup_ques()
@@ -375,10 +380,15 @@ class IpmsgServer(threading.Thread):
         :return:
         """
         logger.debug("sendmsg:" + msg.get_full_unicode_message())
+
+        # SENDCHEKOPTならRECVMSGを戻さないと相手は受信したことがわからない
         if msg.is_sendcheckopt():
             ip_msg = IpmsgMessage(msg.addr, msg.port, msg.packet_no, self._get_packet_no(), self.user_name)
             ip_msg.set_flag(c.IPMSG_RECVMSG)
             self._send(ip_msg)
+
+        msg.born_now()
+        self.received_que.append(msg)
 
     ####################
     # INTERNAL METHOD
