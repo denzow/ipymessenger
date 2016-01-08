@@ -23,11 +23,10 @@ logger.setLevel(DEBUG)
 logger.addHandler(handler)
 
 
-
-
 class IpmsgServer(threading.Thread):
 
     src_host = "0.0.0.0"
+    version = "0.1"
     # TODO
     sended_que_life_time = 30
 
@@ -117,7 +116,7 @@ class IpmsgServer(threading.Thread):
 
         # close socket before ipmsg thread end
         self.sock.close()
-        self.sock = None
+        # self.sock = None
         logger.debug("closed socket")
 
     #########################
@@ -128,7 +127,13 @@ class IpmsgServer(threading.Thread):
         server is running.
         :return:
         """
-        return not (self.sock is None)
+        sock_name = None
+        try:
+            sock_name = self.sock.getsockname()
+        except:
+            pass
+
+        return sock_name is not None
 
 
     def stop(self):
