@@ -32,6 +32,7 @@ class IpmsgServer(threading.Thread):
 
     def __init__(self, user_name, group_name, use_port=2524):
         """
+        IPMSGを管理するメインクラス。
 
         :param user_name: for send message and hostlist
         :param group_name: for hostlist
@@ -45,35 +46,36 @@ class IpmsgServer(threading.Thread):
         self.user_name = user_name
         self.group_name = group_name
 
-        # initialize packet no
+        # パケット番号はユニークじゃないといけないので起動時にベースを決める
         rnd = random.Random()
         self.packet_no = rnd.randint(1, 100000)
-        # create socket
+        # UDPのソケットつくる
+        # ブロードキャストも設定
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # for broad cast
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.sock.bind((self.src_host, self.use_port))
 
-        # for resrve sending
+        # send_que -> sended_que -> age out
+        # 送信待ちのキュー
         self.send_que = deque()
-        # for check send success
+        # recvmsgパケットが届くのをまっているメッセージを格納するキュー
         self.sended_que = deque()
 
-        # initialize hostlist
+        # メンバーリストはニックネームをキーとする
         # {
         #   denzow: HostInfo(osuser:B1308-66-01:0:192.168.24.97:41482:denzow:ymsft_group),
         #   :
         # }
         self.host_list_dict = {}
 
-        # say hello
+        # ネットワークにブロードキャストして参加を通知する
         self._entry()
-        # please hostlist
+        # ほかのメンバーにホストリストをリクエストする
         self._request_host_list()
 
     def run(self):
         """
-        main function
+        メインループ
         :return:
         """
         logger.debug("Start listen.")
@@ -83,38 +85,40 @@ class IpmsgServer(threading.Thread):
                 r, w, e = select.select([self.sock], [self.sock], [], 0)
                 time.sleep(0.1)
                 # print((r, w, e))
-                # recive message
+                # メッセージがきていればここで処理する
                 for sk in r:
                     data, (ip, port) = sk.recvfrom(0x80000)
-                    # parse message
+                    # パケットをIPMSGのフォーマットとしてパース
                     ip_msg = IpmsgMessageParser(ip, port, com.to_unicode(data))
-                    # action for command
+                    # commad属性に応じた処理を行う
                     self.dispatch_action(ip_msg)
 
-                # send message
+                # 送信待ちキューがあれば処理する
                 if w and self.send_que:
-                    # send message loop until que empty.
+                    # キューを全部さばく
                     while self.send_que:
                         # FIFO
                         send_msg = self.send_que.popleft()
                         logger.debug("To[%s:%s]" % (send_msg.addr, send_msg.port))
                         [logger.debug("\t"+x) for x in send_msg.check_flag()]
                         logger.debug(send_msg.get_full_message())
+                        # 指定アドレスにメッセージを投げる
                         self.sock.sendto(send_msg.get_full_message(), (send_msg.addr, send_msg.port))
 
                         if send_msg.is_sendmsg():
-                            # for check sendmsg success
-                            # if long time in the sended que, the message must be failed.
+                            # sendmsgのメッセージだけがrecvmsgによる受信確認が必要なので
+                            # 格納しておく
+                            # ただ、recvmsgをいつまでも保持したくないのでエージアウト用に時間を記録する
                             send_msg.born_time = datetime.datetime.now()
                             self.sended_que.append(send_msg)
-
+                # メッセージキューのメンテナンス
                 self._cleanup_ques()
         except Exception as e:
             error_args = sys.exc_info()
             logger.debug(traceback.print_tb(error_args[2]))
             logger.debug(e)
 
-        # close socket before ipmsg thread end
+        # 終了時にソケットを閉じる
         self.sock.close()
         # self.sock = None
         logger.debug("closed socket")
@@ -124,7 +128,7 @@ class IpmsgServer(threading.Thread):
     #########################
     def is_valid(self):
         """
-        server is running.
+        サーバが起動しているかを確認する
         :return:
         """
         sock_name = None
@@ -138,40 +142,45 @@ class IpmsgServer(threading.Thread):
 
     def stop(self):
         """
-        stop ipmessenger thread
+        サーバを停止する。ただし、即座に停止はせずメインループの終了フラグを設定する
         :return:
         """
         self.stop_event.set()
 
     def send_message(self, to_addr, msg):
         """
-        add send message to send_q
-        :return: packet no because check send success or fail.
+        メッセージを送信する。実際は送信待ちキューへの追加
+        :param to_addr:送信先アドレス
+        :param msg:送るメッセージの文字列
+        :return:送信完了追跡用のパケット番号
         """
         # Ver(1) : Packet No : MyUserName : MyHostName : Command : Extra
+
         packet_no = self._get_packet_no()
-        # socket data must non unicode.
+        # 送信に必要な情報を添えてIpmsgMessageインスタンスにする
         ip_msg = IpmsgMessage(to_addr, self.use_port, msg, packet_no, self.user_name)
+        # IPMSG_SENDMSGフラグを
         ip_msg.set_sendmsg()
         self._send(ip_msg)
 
-        # for follow send status. so return packet no.
         return packet_no
 
     def check_sended_message(self, packet_no):
         """
-        if the packet no is in sended_que and send_que, the message is not success yet.
-        :param packet_no:
-        :return:
+        指定されたパケット番号のメッセージが送信済みかを確認する.
+        ただし、AgeOutの場合でもTrueになるので注意
+        :param packet_no: 確認するパケット番号
+        :return: 送信済みかどうか
         """
+        # 送信待ちか送信後キューの両方から消えていれば送信は完了
         return not ((packet_no in [x.packet_no for x in self.sended_que]) or (packet_no in [x.packet_no for x in self.send_que]))
 
     def send_message_by_nickname(self, nickname, msg):
         """
-        search addr by nickname
-        and
-        add send message to send_q
-        :return: packet no because check send success or fail.
+        ユーザリストのニックネーム指定でメッセージを送信する
+        :param nickname:  送信対象のユーザ名
+        :param msg: 送るメッセージの文字列
+        :return: 送信完了追跡用のパケット番号
         """
         # Ver(1) : Packet No : MyUserName : MyHostName : Command : Extra
 
@@ -189,11 +198,11 @@ class IpmsgServer(threading.Thread):
 
     def send_message_by_fuzzy_nickname(self, nickname, msg):
         """
-        search addr by nickname
-        if nickname's not exist, try to fuzzy search.
-        and
-        add send message to send_q
-        :return: packet no because check send success or fail.
+        ユーザリストのニックネーム指定でメッセージを送信する
+        ただしユーザ名は空白違いなどをある程度無視できる
+        :param nickname:  送信対象のユーザ名
+        :param msg: 送るメッセージの文字列
+        :return: 送信完了追跡用のパケット番号
         """
         # Ver(1) : Packet No : MyUserName : MyHostName : Command : Extra
         # rule list
@@ -224,7 +233,7 @@ class IpmsgServer(threading.Thread):
 
     def get_hostinfo_by_nickname(self, nickname):
         """
-        if the nick_name's info is not exist, return None.
+        指定されたニックネームのホスト情報を戻す
         :param nickname:
         :return:
         """
@@ -235,7 +244,7 @@ class IpmsgServer(threading.Thread):
     #########################
     def dispatch_action(self, ip_msg):
         """
-        dispatch action by
+        メッセージのcommandに応じてアクションに割りあてる
         :param ip_msg:
         :return:
         """
@@ -243,39 +252,47 @@ class IpmsgServer(threading.Thread):
         # TODO debug
         [logger.debug("\t"+x) for x in ip_msg.check_flag()]
 
-        # TODO consider duplicate flag action
+        # TODO フラグが複数ある場合の処理をちゃんと考えないと・・・
+
+        # IP_RECVMSG
         if ip_msg.is_recvmsg():
             self.recvmsg_action(ip_msg)
 
+        # IP_ANSENTRY
         if ip_msg.is_ansentry():
             self.ansentry_action(ip_msg)
 
+        # IP_GETLIST
         if ip_msg.is_getlist():
             self.getlist_action(ip_msg)
 
-        # br_entry's ans entry must be ignore.
-        # another client to  i'm online too.
+        # BR_ENTRYとANSENTRYが同時の場合はほかのユーザが
+        # ネットワークに参加したときに発生する
         if ip_msg.is_br_entry() and not ip_msg.is_ansentry():
-            self.br_entry_action(ip_msg)
+            self.br_entry_with_ansentry_action(ip_msg)
 
         # okgetlist message have getlist flag too.
-        # so if both flag set, ignore.
-        # avoid loop getlist <-> okgetlist
+        # OKGETLISTはホストリスト返答可能フラグ
+        # 返答でくるOKGETLISTはGETLISTとセットでくるので
+        # 両方セットを無視しないと、ループしてしまう
         if ip_msg.is_okgetlist() and not ip_msg.is_getlist():
             self.okgetlist_action(ip_msg)
 
-        # receive message from other host sended.
+        # ほかのホストからメッセージを受信時はSENDMSGが立つ
+        # RECVMSGを戻す
         if ip_msg.is_sendmsg():
             self.sendmsg_action(ip_msg)
 
+        # デバッグ用。受け取ったメッセージをとりあえず表示するだけ
         self.default_action(ip_msg)
 
-        # if recv message any host, should be register host.
+        # TODO こっちで登録したホストはニックネーム化けてるときがある
+        # とりあえず受信したメッセージの送信元はホストリストにいれとく
         self._add_host_list(IpmsgHostinfoParser(ip_msg))
 
     def default_action(self, msg):
         """
-        mock action.
+        デバッグ用です
         :param msg:
         :return:
         """
@@ -283,11 +300,9 @@ class IpmsgServer(threading.Thread):
 
     def recvmsg_action(self, msg):
         """
-        Send message use IPMSG_SENDMSG. if IPMSG_SENDCHECKOPT,
-        receiver return  IPMSG_RECVMSG and same packet_no.
-
-        this case , check sended que and remove target_msg,
-        because the message is success sending.
+        IPMSG_RECVMSGはIPMSG_SENDCHECKOPTに対する返信なので
+        受け取ったら紐づくメッセージを送信済みにする(キューから消す)
+        紐づくかは、RECVMSGのメッセージ部分とパケット番号の比較で可能
         """
         logger.debug("recvmsg:" + msg.get_full_unicode_message())
         for s_msg in self.sended_que:
@@ -300,8 +315,9 @@ class IpmsgServer(threading.Thread):
 
     def ansentry_action(self, msg):
         """
-        ansentry is response for brentry
-        add host_list
+        ANSENTRYはBR_ENTRYの返答。自分がネットワーク参加時に
+        他ホストから送信されるもの。
+        (たしか)なにもしなくてよかったはず・・・
 
         :param msg:
         :return:
@@ -311,8 +327,8 @@ class IpmsgServer(threading.Thread):
 
     def okgetlist_action(self, msg):
         """
-        recv okgetlist, send to getlist packet.
-
+        OKGETLISTを受け取ったら、相手にGETLISTを投げてホストリストを
+        要求する
         :param msg:
         :return:
         """
@@ -324,10 +340,10 @@ class IpmsgServer(threading.Thread):
         ip_msg.set_flag(c.IPMSG_GETLIST)
         self._send(ip_msg)
 
+    # TODO ホストリストが長い場合のプロトコルに対応できていない
     def getlist_action(self, msg):
         """
-        when get hostlist then register self.host_list_dict
-        host_list key is nick_name.
+        GETLISTを受け取ったら、ホストリストを解釈し登録する
 
         :param msg:
         :return:
@@ -338,11 +354,10 @@ class IpmsgServer(threading.Thread):
         for host in host_list:
             self._add_host_list(host)
 
-    def br_entry_action(self, msg):
+    def br_entry_with_ansentry_action(self, msg):
         """
-        if recv br_entry, must be send ansentry.
-        and add host_list
-        # 1:1452074470:Administrator-<848363a9d00e6944>:YAMADROID2003:224399361:YAMADROID2003\x00\x00\nUN\x00
+        BR_ENTRYを受け取ったらANSENTRYを戻して相手に自分を伝える。
+        さらに送信元を自分のホストリストに追加する
         :param msg:
         :return:
         """
@@ -355,7 +370,7 @@ class IpmsgServer(threading.Thread):
 
     def sendmsg_action(self, msg):
         """
-        recv message action
+        ほかのホストからメッセージを受け取ったときのアクション
         :param msg:
         :return:
         """
@@ -371,8 +386,8 @@ class IpmsgServer(threading.Thread):
 
     def _entry(self):
         """
-        join ipmsg network
-        send BR_ENTRY
+        ネットワークに参加
+        ブロードキャストで伝える
         """
         # Ver : PacketNo : User : Host : Command : Msg
         #send_msg = "1:%s:sayamada:B1308-66-01:%d:sayamada\00sayamada_group\00" % (self.get_packet_no(), command)
@@ -380,13 +395,14 @@ class IpmsgServer(threading.Thread):
 
         ip_msg = IpmsgMessage("255.255.255.255", self.use_port, send_msg, self._get_packet_no(), self.user_name)
         ip_msg.set_flag(c.IPMSG_BR_ENTRY)
-        # todo it's must be broadcast addr
+        # todo 任意のアドレスにもブロードキャストできるべき
         self._send(ip_msg)
-        #self.sock.sendto(send_msg.encode("utf-8"), ("255.255.255.255", self.use_port))
-        # it is for test.
-        # self.sock.sendto(send_msg.encode("utf-8"), (self.dest_host, self.use_port))
 
     def _request_host_list(self):
+        """
+        IPMSG_BR_ISGETLIST2を送信しホストリストを送ってくれるを探す
+        :return:
+        """
         #1:801798212:root:falcon:6291480:(\00)
         ip_msg = IpmsgMessage("255.255.255.255", self.use_port, "", self._get_packet_no(), self.user_name)
         ip_msg.set_flag(c.IPMSG_BR_ISGETLIST2)
@@ -394,19 +410,25 @@ class IpmsgServer(threading.Thread):
 
     def _get_packet_no(self):
         """
-        get packet no
+        インクリメントしてパケット番号を戻す
+        送信メッセージは文字列なので文字列で戻している
         """
         self.packet_no += 1
         # msg is not int. so packet_no must be str too.
         return unicode(self.packet_no)
 
     def _send(self, ip_msg):
+        """
+        送信キューに追加
+        :param ip_msg:
+        :return:
+        """
         self.send_que.append(ip_msg)
 
     def _add_host_list(self, host_info):
         """
-        append host info
-        nick_name must be uniq.
+        IpmsgHostinfoインスタンスをうけとり
+        nick_nameをキーに登録する
         :param host_info:
         :return:
         """
@@ -414,10 +436,7 @@ class IpmsgServer(threading.Thread):
 
     def _cleanup_ques(self):
         """
-        old msg discard.
-        * sended_que
-        TODO
-        unread_que
+        だいぶ古い送信完了確認キューを待機する
         :return:
         """
 
