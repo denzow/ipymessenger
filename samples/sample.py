@@ -5,12 +5,14 @@ from __future__ import print_function, unicode_literals
 import sys
 import time
 import traceback
-
+from logging import StreamHandler
 from ipymessenger.IpmsgServer import IpmsgServer
 
 if __name__ == "__main__":
 
     dest_host = "192.168.26.189"
+    # デバッグメッセージが必要な場合はloggingのHandlerを渡す
+    #ip = IpmsgServer("sayamada", "ymsft_group", 2722, StreamHandler())
     ip = IpmsgServer("sayamada", "ymsft_group", 2722)
     try:
         ip.start()

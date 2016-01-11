@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding:utf-8
 
+from __future__ import print_function, unicode_literals
 from setuptools import setup, find_packages
 import os
 
@@ -13,7 +14,7 @@ if os.path.exists('README_pypi.md'):
         long_description = read_md('README_pypi.md')
 
     except ImportError:
-        print "warning: pypandoc module not found, could not convert Markdown to RST"
+        print("warning: pypandoc module not found, could not convert Markdown to RST")
         read_md = lambda f: open(f, 'r').read()
         long_description = read_md('README_pypi.md')
 

@@ -19,27 +19,30 @@ from logging import getLogger, StreamHandler, DEBUG
 logger = getLogger(__name__)
 handler = StreamHandler()
 handler.setLevel(DEBUG)
-logger.setLevel(DEBUG)
-logger.addHandler(handler)
 
 
 class IpmsgServer(threading.Thread):
 
     src_host = "0.0.0.0"
     # TODO
-    sended_que_life_time = 30
+    sended_que_life_time = 100
     received_que_life_time = 100
 
-    def __init__(self, user_name, group_name, use_port=2524):
+    def __init__(self, user_name, group_name, use_port=2524, opt_debug_handler=None):
         """
         IPMSGを管理するメインクラス。
 
         :param user_name: for send message and hostlist
         :param group_name: for hostlist
         :param use_port: listening port
+        :param opt_debug_handler: debug messages's handler
         :return:
         """
         super(IpmsgServer, self).__init__()
+
+        if opt_debug_handler:
+            logger.addHandler(opt_debug_handler)
+            logger.setLevel(DEBUG)
 
         self.stop_event = threading.Event()
         self.use_port = use_port

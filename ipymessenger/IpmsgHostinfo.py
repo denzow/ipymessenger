@@ -39,7 +39,7 @@ class IpmsgHostinfo(object):
         )
 
     def __repr__(self):
-        return "IpmsgHostinfo:%s:%s:%s:%s:%s:%s:%s" % (
+        return ("IpmsgHostinfo:%s:%s:%s:%s:%s:%s:%s" % (
             self.user_name,
             self.host_name,
             self.command,
@@ -47,7 +47,7 @@ class IpmsgHostinfo(object):
             self.port,
             self.nick_name,
             self.group
-        ).encode("utf-8")
+        )).encode("utf-8")
 
 
 def IpmsgHostinfoListParser(hostlist_str):
