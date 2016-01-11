@@ -28,7 +28,7 @@ class IpmsgServer(threading.Thread):
     sended_que_life_time = 100
     received_que_life_time = 100
 
-    def __init__(self, user_name, group_name, use_port=2524, opt_debug_handler=None):
+    def __init__(self, user_name, group_name="", use_port=2524, opt_debug_handler=None):
         """
         IPMSGを管理するメインクラス。
 
@@ -48,6 +48,8 @@ class IpmsgServer(threading.Thread):
         self.use_port = use_port
         self.user_name = user_name
         self.group_name = group_name
+        # デフォルトのSENDMSGに対するハンドラはなにもしない
+        self._sendmsg_handler = lambda x: None
 
         # パケット番号はユニークじゃないといけないので起動時にベースを決める
         rnd = random.Random()
@@ -246,6 +248,32 @@ class IpmsgServer(threading.Thread):
         """
         return self.host_list_dict.get(nickname, None)
 
+    def set_sendmsg_handler(self, function):
+        """
+        IPMSG_SENDMSG(他のホストからのメッセージ受信)のメッセージが届いた歳の
+        処理関数を登録する
+        :param function:
+        :return:
+        """
+        self._sendmsg_handler = function
+
+    def get_message(self, from_addr, num=1, remove=False):
+        """
+        受信メッセージを取り出す
+        :param from_addr:
+        :param num:
+        :param remove:
+        :return:
+        """
+        matched_received_list = [msg for msg in self.received_que if msg.addr == from_addr][0:num]
+        if remove:
+            for msg in matched_received_list:
+                logger.debug("Remove rcv:[%s:%s]" % (msg.packet_no, msg.addr))
+                self.received_que.remove(msg)
+
+        return matched_received_list
+
+
     #########################
     # ACTION LIST
     #########################
@@ -389,6 +417,7 @@ class IpmsgServer(threading.Thread):
             ip_msg.set_flag(c.IPMSG_RECVMSG)
             self._send(ip_msg)
 
+        self._sendmsg_handler(msg)
         msg.born_now()
         self.received_que.append(msg)
 
@@ -453,11 +482,17 @@ class IpmsgServer(threading.Thread):
         """
 
         now = datetime.datetime.now()
-        aged_out_list = [msg for msg in self.sended_que if (now - msg.born_time) > datetime.timedelta(seconds=self.sended_que_life_time)]
-        for msg in aged_out_list:
-            logger.debug("Age out:[%s:%s]" % (msg.packet_no, msg.addr))
+        # 送信済みメッセージのクリーンアップ
+        aged_out_sended_list = [msg for msg in self.sended_que if (now - msg.born_time) > datetime.timedelta(seconds=self.sended_que_life_time)]
+        for msg in aged_out_sended_list:
+            logger.debug("Age out sended:[%s:%s]" % (msg.packet_no, msg.addr))
             self.sended_que.remove(msg)
 
+        # 受信メッセージのクリーンアップ
+        aged_out_received_list = [msg for msg in self.received_que if (now - msg.born_time) > datetime.timedelta(seconds=self.received_que_life_time)]
+        for msg in aged_out_received_list:
+            logger.debug("Age out rcv:[%s:%s]" % (msg.packet_no, msg.addr))
+            self.received_que.remove(msg)
 
 class IpmsgException(Exception):
     def __init__(self, message):

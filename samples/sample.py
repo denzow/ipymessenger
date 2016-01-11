@@ -15,6 +15,7 @@ if __name__ == "__main__":
     #ip = IpmsgServer("sayamada", "ymsft_group", 2722, StreamHandler())
     ip = IpmsgServer("sayamada", "ymsft_group", 2722)
     try:
+        ip.set_sendmsg_handler(lambda x:print(x))
         ip.start()
         time.sleep(10)
         hello_no = ip.send_message(dest_host, "へろー")
