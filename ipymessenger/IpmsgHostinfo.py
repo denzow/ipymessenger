@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding:utf-8
 from __future__ import print_function, unicode_literals
-from lib.consts import command_const as c
+from ipymessenger.consts import command_const as c
 
 class IpmsgHostinfo(object):
 

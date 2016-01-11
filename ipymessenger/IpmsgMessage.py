@@ -3,7 +3,7 @@
 from __future__ import print_function, unicode_literals
 from socket import gethostname
 import datetime
-from lib.consts import command_const as c
+from ipymessenger.consts import command_const as c
 
 
 class IpmsgMessage(object):

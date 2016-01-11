@@ -6,7 +6,7 @@ import sys
 import time
 import traceback
 
-from IpmsgServer import IpmsgServer
+from ipymessenger.IpmsgServer import IpmsgServer
 
 if __name__ == "__main__":
 

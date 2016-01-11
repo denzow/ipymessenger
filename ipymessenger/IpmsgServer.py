@@ -7,14 +7,14 @@ import socket
 import threading
 import sys
 import traceback
-from lib.consts import command_const as c
+from ipymessenger.consts import command_const as c
 from collections import deque
 import time
 import random
 import datetime
-from lib.IpmsgMessage import IpmsgMessage, IpmsgMessageParser
-from lib.IpmsgHostinfo import IpmsgHostinfo, IpmsgHostinfoListParser, IpmsgHostinfoParser
-import lib.common as com
+from ipymessenger.IpmsgMessage import IpmsgMessage, IpmsgMessageParser
+from ipymessenger.IpmsgHostinfo import IpmsgHostinfo, IpmsgHostinfoListParser, IpmsgHostinfoParser
+import ipymessenger.common as com
 from logging import getLogger, StreamHandler, DEBUG
 logger = getLogger(__name__)
 handler = StreamHandler()
@@ -26,7 +26,6 @@ logger.addHandler(handler)
 class IpmsgServer(threading.Thread):
 
     src_host = "0.0.0.0"
-    version = "0.1"
     # TODO
     sended_que_life_time = 30
     received_que_life_time = 100
