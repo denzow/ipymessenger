@@ -14,7 +14,7 @@ import random
 import datetime
 from ipymessenger.IpmsgMessage import IpmsgMessage, IpmsgMessageParser
 from ipymessenger.IpmsgHostinfo import IpmsgHostinfo, IpmsgHostinfoListParser, IpmsgHostinfoParser
-import ipymessenger.common as com
+from ipymessenger.common import to_unicode, adjust_name
 from logging import getLogger, StreamHandler, DEBUG
 logger = getLogger(__name__)
 handler = StreamHandler()
@@ -98,7 +98,7 @@ class IpmsgServer(threading.Thread):
                 for sk in r:
                     data, (ip, port) = sk.recvfrom(0x80000)
                     # パケットをIPMSGのフォーマットとしてパース
-                    ip_msg = IpmsgMessageParser(ip, port, com.to_unicode(data))
+                    ip_msg = IpmsgMessageParser(ip, port, to_unicode(data))
                     # commad属性に応じた処理を行う
                     self.dispatch_action(ip_msg)
 
@@ -122,7 +122,7 @@ class IpmsgServer(threading.Thread):
                             self.sended_que.append(send_msg)
                 # メッセージキューのメンテナンス
                 self._cleanup_ques()
-        except Exception as e:
+        except IndentationError as e:
             error_args = sys.exc_info()
             logger.debug(traceback.print_tb(error_args[2]))
             logger.debug(e)
@@ -131,6 +131,7 @@ class IpmsgServer(threading.Thread):
         self.sock.close()
         # self.sock = None
         logger.debug("closed socket")
+
 
     #########################
     # PUBLIC METHOD
@@ -218,10 +219,10 @@ class IpmsgServer(threading.Thread):
         # (func, name + args)
         try_rule_list = [
             (lambda x: x, [nickname]),  # 1st do nothing
-            (com.adjust_name, [nickname, ""]),
-            (com.adjust_name, [nickname, " "]),  # single space
-            (com.adjust_name, [nickname, "  "]),  # double single space
-            (com.adjust_name, [nickname, "　"]),  # multi byte space
+            (adjust_name, [nickname, ""]),
+            (adjust_name, [nickname, " "]),  # single space
+            (adjust_name, [nickname, "  "]),  # double single space
+            (adjust_name, [nickname, "　"]),  # multi byte space
         ]
         host_info = None
         for rule_func, rule_arg in try_rule_list:
@@ -406,20 +407,22 @@ class IpmsgServer(threading.Thread):
     def sendmsg_action(self, msg):
         """
         ほかのホストからメッセージを受け取ったときのアクション
+        RECVMSGは無視
         :param msg:
         :return:
         """
         logger.debug("sendmsg:" + msg.get_full_unicode_message())
-
         # SENDCHEKOPTならRECVMSGを戻さないと相手は受信したことがわからない
         if msg.is_sendcheckopt():
             ip_msg = IpmsgMessage(msg.addr, msg.port, msg.packet_no, self._get_packet_no(), self.user_name)
             ip_msg.set_flag(c.IPMSG_RECVMSG)
             self._send(ip_msg)
 
-        self._sendmsg_handler(msg)
-        msg.born_now()
-        self.received_que.append(msg)
+        if not msg.is_recvmsg():
+
+            self._sendmsg_handler(msg)
+            msg.born_now()
+            self.received_que.append(msg)
 
     ####################
     # INTERNAL METHOD
@@ -493,6 +496,7 @@ class IpmsgServer(threading.Thread):
         for msg in aged_out_received_list:
             logger.debug("Age out rcv:[%s:%s]" % (msg.packet_no, msg.addr))
             self.received_que.remove(msg)
+
 
 class IpmsgException(Exception):
     def __init__(self, message):

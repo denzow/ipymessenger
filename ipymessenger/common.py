@@ -14,6 +14,7 @@ def to_unicode(string):
     :return:
     """
     encode = guess_charset(string)
+    # print encode, string
     try:
         return string.decode(encode)
     except UnicodeDecodeError:
@@ -22,13 +23,13 @@ def to_unicode(string):
 
 def guess_charset(data):
     try:
-        data.decode("utf-8")
-        return "utf-8"
+        data.decode("shift-jis")
+        return "shift-jis"
     except:
         pass
     try:
-        data.decode("shift-jis")
-        return "shift-jis"
+        data.decode("utf-8")
+        return "utf-8"
     except:
         pass
     try:
