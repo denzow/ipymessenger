@@ -19,7 +19,7 @@ if __name__ == "__main__":
         #ip.set_sendmsg_handler(lambda x:print(x))
         ip.start()
         time.sleep(5)
-        hello_no = ip.send_message(dest_host, "へろー")
+        #hello_no = ip.send_message(dest_host, "へろー")
         """
         #time.sleep(3)
         print("######hello is success:" + str(ip.check_sended_message(hello_no)))
@@ -31,6 +31,8 @@ if __name__ == "__main__":
 
         print(ip.sended_que)
         """
+        time.sleep(10)
+        print(ip.get_message("192.168.26.189"))
         time.sleep(10)
         print(ip.get_message("192.168.26.189"))
         time.sleep(100)

@@ -28,7 +28,8 @@ class IpmsgServer(threading.Thread):
     sended_que_life_time = 100
     received_que_life_time = 100
 
-    def __init__(self, user_name, group_name="", use_port=2524, opt_debug_handler=None):
+    def __init__(self, user_name, group_name="", use_port=2524, opt_debug_handler=None,
+                 sended_que_life_time=100, received_que_life_time = 100):
         """
         IPMSGを管理するメインクラス。
 
@@ -97,6 +98,8 @@ class IpmsgServer(threading.Thread):
                 # メッセージがきていればここで処理する
                 for sk in r:
                     data, (ip, port) = sk.recvfrom(0x80000)
+                    #logger.debug("raw message.")
+                    #logger.debug(data)
                     # パケットをIPMSGのフォーマットとしてパース
                     ip_msg = IpmsgMessageParser(ip, port, to_unicode(data))
                     # commad属性に応じた処理を行う
@@ -267,10 +270,19 @@ class IpmsgServer(threading.Thread):
         :return:
         """
         matched_received_list = [msg for msg in self.received_que if msg.addr == from_addr][0:num]
-        if remove:
-            for msg in matched_received_list:
+
+        for msg in matched_received_list:
+            # 削除処理
+            if remove:
                 logger.debug("Remove rcv:[%s:%s]" % (msg.packet_no, msg.addr))
                 self.received_que.remove(msg)
+
+            # 封書の場合は開封パケットを送る
+            # remove=Falseだと何回か開封パケットが飛ぶがエラーにはならないようなのでよしとする
+            if msg.is_secretopt():
+                ip_msg = IpmsgMessage(msg.addr, msg.port, msg.packet_no, self._get_packet_no(), self.user_name)
+                ip_msg.set_flag(c.IPMSG_READMSG)
+                self._send(ip_msg)
 
         return matched_received_list
 
@@ -318,6 +330,9 @@ class IpmsgServer(threading.Thread):
         # RECVMSGを戻す
         if ip_msg.is_sendmsg():
             self.sendmsg_action(ip_msg)
+
+        if ip_msg.is_br_exit() and not ip_msg.is_br_entry():
+            self.br_exit_action(ip_msg)
 
         # デバッグ用。受け取ったメッセージをとりあえず表示するだけ
         self.default_action(ip_msg)
@@ -418,11 +433,27 @@ class IpmsgServer(threading.Thread):
             ip_msg.set_flag(c.IPMSG_RECVMSG)
             self._send(ip_msg)
 
+        # RCVの場合はただの返答パケットなので無視しないといけない
         if not msg.is_recvmsg():
-
             self._sendmsg_handler(msg)
             msg.born_now()
             self.received_que.append(msg)
+
+    def br_exit_action(self, msg):
+        """
+        BR_EXITを受け取ったら送信ホストをホストリストから削除する
+        :param msg:
+        :return:
+        """
+        logger.debug("br_exit:" + msg.get_full_message().__repr__())
+        logger.debug("br_exit:" + msg.message.__repr__())
+        # TODO
+        # メッセージ部分をつかわないといけない
+        try:
+            self.host_list_dict.pop(msg.username)
+        except KeyError:
+            pass
+
 
     ####################
     # INTERNAL METHOD

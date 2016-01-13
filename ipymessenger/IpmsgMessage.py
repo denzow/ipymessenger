@@ -99,6 +99,12 @@ class IpmsgMessage(object):
     def is_br_entry(self):
         return self.is_type(c.IPMSG_BR_ENTRY)
 
+    def is_br_exit(self):
+        return self.is_type(c.IPMSG_BR_EXIT)
+
+    def is_secretopt(self):
+        return self.is_type(c.IPMSG_SECRETOPT)
+
     def check_flag(self):
         """
         main reason. for debug.

@@ -12,8 +12,8 @@ if __name__ == "__main__":
 
     dest_host = "192.168.26.189"
     # デバッグメッセージが必要な場合はloggingのHandlerを渡す
-    #ip = IpmsgServer("sayamada", "ymsft_group", 2722, StreamHandler())
-    ip = IpmsgServer("sayamada", "ymsft_group", 2722)
+    ip = IpmsgServer("sayamada", "ymsft_group", 2722, StreamHandler())
+    #ip = IpmsgServer("sayamada", "ymsft_group", 2722)
     try:
         ip.set_sendmsg_handler(lambda x:print(x))
         ip.start()

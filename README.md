@@ -98,6 +98,5 @@ else:
 ## TODO
 
 * send SECRET message
-* recv SECRET message
 * register hostinfo correctry other than via getlist
 * remove hostlist when rcv br_exit.
