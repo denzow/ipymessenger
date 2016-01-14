@@ -68,7 +68,7 @@ def IpmsgHostinfoListParser(hostlist_str):
 
 
 def IpmsgHostinfoParser(normal_message_inst):
-    print("DEBUG", normal_message_inst, normal_message_inst.message.__repr__())
+    #print("DEBUG", normal_message_inst, normal_message_inst.message.__repr__())
     #user_name, host_name, command, addr, port, nick_name, group):
 
     nick_name = None

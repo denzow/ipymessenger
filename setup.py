@@ -28,7 +28,7 @@ classifiers = [
 
 setup(
     name="ipymessenger",
-    version="0.0.2.2",
+    version="0.0.3",
     description="ip messenger library fro python",
     url="https://github.com/denzow/ipymessenger",
     license="MIT",

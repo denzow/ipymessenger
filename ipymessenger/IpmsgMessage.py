@@ -66,6 +66,13 @@ class IpmsgMessage(object):
         self.set_flag(c.IPMSG_SENDCHECKOPT)
         self.set_flag(c.IPMSG_SENDMSG)
 
+    def set_secretopt(self):
+        """
+        this message is sendmessage
+        :return:
+        """
+        #self.command = 8405280
+        self.set_flag(c.IPMSG_SECRETOPT)
 
     def set_ansentry(self):
         self.set_flag(c.IPMSG_ANSENTRY)
@@ -104,6 +111,10 @@ class IpmsgMessage(object):
 
     def is_secretopt(self):
         return self.is_type(c.IPMSG_SECRETOPT)
+
+    def is_readmsg(self):
+        return self.is_type(c.IPMSG_READMSG)
+
 
     def check_flag(self):
         """

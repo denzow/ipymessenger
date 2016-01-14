@@ -26,7 +26,7 @@ class IpmsgServer(threading.Thread):
     src_host = "0.0.0.0"
 
     def __init__(self, user_name, group_name="", use_port=2524, opt_debug_handler=None,
-                 sended_que_life_time=100, received_que_life_time=100, broad_cast_addrs=None):
+                 sended_que_life_time=6000, received_que_life_time=6000, wait_read_que_life_time=6000, broad_cast_addrs=None):
         """
         IPメッセンジャーを送受信するメインクラス
         スレッドで動作する
@@ -55,6 +55,7 @@ class IpmsgServer(threading.Thread):
 
         self.sended_que_life_time = sended_que_life_time
         self.received_que_life_time = received_que_life_time
+        self.wait_read_que_life_time = wait_read_que_life_time
         # broadcast
         self.broad_cast_addrs = [
             "255.255.255.255"
@@ -87,6 +88,8 @@ class IpmsgServer(threading.Thread):
         # sendmsgで受け取ったキュー
         # 受信箱
         self.received_que = deque()
+        # 未開封キュー
+        self.wait_read_que = deque()
 
         # メンバーリストはニックネームをキーとする
         # {
@@ -115,8 +118,8 @@ class IpmsgServer(threading.Thread):
                 # メッセージがきていればここで処理する
                 for sk in r:
                     data, (ip, port) = sk.recvfrom(0x80000)
-                    #logger.debug("raw message.")
-                    #logger.debug(data)
+                    logger.debug("raw message:")
+                    logger.debug(data)
                     # パケットをIPMSGのフォーマットとしてパース
                     ip_msg = IpmsgMessageParser(ip, port, to_unicode(data))
                     # commad属性に応じた処理を行う
@@ -177,7 +180,7 @@ class IpmsgServer(threading.Thread):
         """
         self.stop_event.set()
 
-    def send_message(self, to_addr, msg):
+    def send_message(self, to_addr, msg, is_secret=False):
         """
         メッセージを送信する。実際は送信待ちキューへの追加
         :param to_addr:送信先アドレス
@@ -185,27 +188,20 @@ class IpmsgServer(threading.Thread):
         :return:送信完了追跡用のパケット番号
         """
         # Ver(1) : Packet No : MyUserName : MyHostName : Command : Extra
-
         packet_no = self._get_packet_no()
         # 送信に必要な情報を添えてIpmsgMessageインスタンスにする
         ip_msg = IpmsgMessage(to_addr, self.use_port, msg, packet_no, self.user_name)
-        # IPMSG_SENDMSGフラグを
+        # IPMSG_SENDMSGフラグを立てる
         ip_msg.set_sendmsg()
+
+        if is_secret:
+            ip_msg.set_secretopt()
+
         self._send(ip_msg)
 
         return packet_no
 
-    def check_sended_message(self, packet_no):
-        """
-        指定されたパケット番号のメッセージが送信済みかを確認する.
-        ただし、AgeOutの場合でもTrueになるので注意
-        :param packet_no: 確認するパケット番号
-        :return: 送信済みかどうか
-        """
-        # 送信待ちか送信後キューの両方から消えていれば送信は完了
-        return not ((packet_no in [x.packet_no for x in self.sended_que]) or (packet_no in [x.packet_no for x in self.send_que]))
-
-    def send_message_by_nickname(self, nickname, msg):
+    def send_message_by_nickname(self, nickname, msg, is_secret=False):
         """
         ユーザリストのニックネーム指定でメッセージを送信する
         :param nickname:  送信対象のユーザ名
@@ -217,16 +213,11 @@ class IpmsgServer(threading.Thread):
         host_info = self.get_hostinfo_by_nickname(nickname)
 
         if host_info:
-            packet_no = self._get_packet_no()
-            ip_msg = IpmsgMessage(host_info.addr, self.use_port, msg, packet_no, self.user_name)
-            ip_msg.set_sendmsg()
-            self._send(ip_msg)
-            # for follow send status. so return packet no.
-            return packet_no
+            return self.send_message(host_info.addr, msg, is_secret=is_secret)
         else:
             raise IpmsgException("nickname matched host is not found.")
 
-    def send_message_by_fuzzy_nickname(self, nickname, msg):
+    def send_message_by_fuzzy_nickname(self, nickname, msg, is_secret=False):
         """
         ユーザリストのニックネーム指定でメッセージを送信する
         ただしユーザ名は空白違いなどをある程度無視できる
@@ -252,16 +243,11 @@ class IpmsgServer(threading.Thread):
                 break
 
         if host_info:
-            packet_no = self._get_packet_no()
-            ip_msg = IpmsgMessage(host_info.addr, self.use_port, msg, packet_no, self.user_name)
-            ip_msg.set_sendmsg()
-            self._send(ip_msg)
-            # for follow send status. so return packet no.
-            return packet_no
+            return self.send_message(host_info.addr, msg, is_secret=is_secret)
         else:
             raise IpmsgException("nickname fuzzy matched host is not found.")
 
-    def send_message_by_osusername(self, username, msg):
+    def send_message_by_osusername(self, username, msg, is_secret=False):
         """
         ユーザリストのニックネーム指定でメッセージを送信する
         :param username:  送信対象のユーザ名
@@ -273,14 +259,31 @@ class IpmsgServer(threading.Thread):
         host_info = self.get_hostinfo_by_osusername(username)
 
         if host_info:
-            packet_no = self._get_packet_no()
-            ip_msg = IpmsgMessage(host_info.addr, self.use_port, msg, packet_no, self.user_name)
-            ip_msg.set_sendmsg()
-            self._send(ip_msg)
-            # for follow send status. so return packet no.
-            return packet_no
+            return self.send_message(host_info.addr, msg, is_secret=is_secret)
         else:
             raise IpmsgException("username matched host is not found.")
+
+    def check_sended_message(self, packet_no):
+        """
+        指定されたパケット番号のメッセージが送信済みかを確認する.
+        ただし、AgeOutの場合でもTrueになるので注意
+        :param packet_no: 確認するパケット番号
+        :return: 送信済みかどうか
+        """
+        # 送信待ちか送信後キューの両方から消えていれば送信は完了
+        return not ((packet_no in [x.packet_no for x in self.sended_que]) or (packet_no in [x.packet_no for x in self.send_que]))
+
+    def check_readed_message(self, packet_no):
+        """
+        指定されたパケット番号のメッセージが送信済みかを確認する.
+        ただし、AgeOutの場合でもTrueになるので注意
+        :param packet_no: 確認するパケット番号
+        :return: 送信済みかどうか
+        """
+        # 送信後キューと開封まちキューの両方から消えていれば送信は完了
+        return not ((packet_no in [x.packet_no for x in self.wait_read_que]) or (packet_no in [x.packet_no for x in self.sended_que]))
+
+
 
     def get_hostinfo_by_nickname(self, nickname):
         """
@@ -361,7 +364,7 @@ class IpmsgServer(threading.Thread):
 
         # TODO フラグが複数ある場合の処理をちゃんと考えないと・・・
 
-        # IP_RECVMSG
+        # メッセージが無事に届いた
         if ip_msg.is_recvmsg():
             self.recvmsg_action(ip_msg)
 
@@ -390,8 +393,16 @@ class IpmsgServer(threading.Thread):
 
         # ほかのホストからメッセージを受信時はSENDMSGが立つ
         # RECVMSGを戻す
+        # recvmsgが立っている場合は、sendchkoptの返送なので無視
         if ip_msg.is_sendmsg():
-            self.sendmsg_action(ip_msg)
+            if ip_msg.is_recvmsg():
+                pass
+            elif ip_msg.is_readmsg():
+                # 封書開封
+                self.readmsg_action(ip_msg)
+
+            else:
+                self.sendmsg_action(ip_msg)
 
         if ip_msg.is_br_exit() and not ip_msg.is_br_entry():
             self.br_exit_action(ip_msg)
@@ -419,11 +430,14 @@ class IpmsgServer(threading.Thread):
         """
         logger.debug("recvmsg:" + msg.get_full_unicode_message())
         for s_msg in self.sended_que:
-
             # packet_no is not endwith \00
             if s_msg.packet_no == msg.message.rstrip("\00"):
                 # logger.debug("send success:" + s_msg.get_full_message())
                 self.sended_que.remove(s_msg)
+                # 封書なら開封まちキューに移動
+                if s_msg.is_secretopt():
+                    self.wait_read_que.append(s_msg)
+
                 break
 
     def ansentry_action(self, msg):
@@ -514,6 +528,22 @@ class IpmsgServer(threading.Thread):
             msg.born_now()
             self.received_que.append(msg)
 
+    def readmsg_action(self, msg):
+        """
+        封書の開封通知を受け取った時のアクション
+        :param msg: 受信メッセージ(メッセージ部が封書だったメッセージのパケット番号)
+        :return:
+        """
+        logger.debug("readmsg:" + msg.get_full_unicode_message())
+        # SENDCHEKOPTならRECVMSGを戻さないと相手は受信したことがわからない
+        for s_msg in self.wait_read_que:
+            # packet_no is not endwith \00
+            if s_msg.packet_no == msg.message.rstrip("\00"):
+                # logger.debug("send success:" + s_msg.get_full_message())
+                self.wait_read_que.remove(s_msg)
+                break
+
+
     def br_exit_action(self, msg):
         """
         BR_EXITを受け取ったら送信ホストをホストリストから削除する
@@ -591,6 +621,7 @@ class IpmsgServer(threading.Thread):
 
         * 送信済キュー
         * 受信キュー
+        * 開封待ちキュー
 
         :return:
         """
@@ -607,6 +638,12 @@ class IpmsgServer(threading.Thread):
         for msg in aged_out_received_list:
             logger.debug("Age out rcv:[%s:%s]" % (msg.packet_no, msg.addr))
             self.received_que.remove(msg)
+
+        # 開封待ちキューのクリーンアップ
+        aged_out_read_wait_list = [msg for msg in self.wait_read_que if (now - msg.born_time) > datetime.timedelta(seconds=self.wait_read_que_life_time)]
+        for msg in aged_out_read_wait_list:
+            logger.debug("Age out readwait:[%s:%s]" % (msg.packet_no, msg.addr))
+            self.wait_read_que.remove(msg)
 
 
 class IpmsgException(Exception):
