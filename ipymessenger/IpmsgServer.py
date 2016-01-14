@@ -261,13 +261,56 @@ class IpmsgServer(threading.Thread):
         else:
             raise IpmsgException("nickname fuzzy matched host is not found.")
 
+    def send_message_by_osusername(self, username, msg):
+        """
+        ユーザリストのニックネーム指定でメッセージを送信する
+        :param username:  送信対象のユーザ名
+        :param msg: 送るメッセージの文字列
+        :return: 送信完了追跡用のパケット番号
+        """
+        # Ver(1) : Packet No : MyUserName : MyHostName : Command : Extra
+
+        host_info = self.get_hostinfo_by_osusername(username)
+
+        if host_info:
+            packet_no = self._get_packet_no()
+            ip_msg = IpmsgMessage(host_info.addr, self.use_port, msg, packet_no, self.user_name)
+            ip_msg.set_sendmsg()
+            self._send(ip_msg)
+            # for follow send status. so return packet no.
+            return packet_no
+        else:
+            raise IpmsgException("username matched host is not found.")
+
     def get_hostinfo_by_nickname(self, nickname):
         """
         指定されたニックネームのホスト情報を戻す
         :param nickname: 情報を取得したいニックネーム
         :return: IpmsgHostinfoインスタンス or None
         """
-        return self.host_list_dict.get(nickname, None)
+        ret = None
+        for nick in self.host_list_dict:
+            if nickname in nick:
+                ret = self.host_list_dict[nick]
+
+        return ret
+
+    def get_hostinfo_by_osusername(self, username):
+        """
+        指定されたユーザー名のホスト情報を戻す
+        :param username: 情報を取得したいユーザ名
+        :return: IpmsgHostinfoインスタンス or None
+        """
+        ret = None
+        for host_info in self.host_list_dict.values():
+            print( username , host_info.user_name)
+            if username in host_info.user_name:
+                ret = host_info
+
+        return ret
+
+
+
 
     def set_sendmsg_handler(self, function):
         """

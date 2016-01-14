@@ -31,7 +31,9 @@ if __name__ == "__main__":
 
         print(ip.sended_que)
         """
-        time.sleep(10)
+        test_no = ip.send_message_by_osusername("Administrator", "へろー by name")
+        time.sleep(5)
+        print("######test_no is success:" + str(ip.check_sended_message(test_no)))
         print(ip.get_message("192.168.26.189"))
         time.sleep(10)
         print(ip.get_message("192.168.26.189"))

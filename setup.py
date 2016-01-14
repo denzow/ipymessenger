@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding:utf-8
 
-from __future__ import print_function, unicode_literals
+from __future__ import print_function
 from setuptools import setup, find_packages
 import os
 
@@ -28,7 +28,7 @@ classifiers = [
 
 setup(
     name="ipymessenger",
-    version="0.0.2",
+    version="0.0.2.2",
     description="ip messenger library fro python",
     url="https://github.com/denzow/ipymessenger",
     license="MIT",
