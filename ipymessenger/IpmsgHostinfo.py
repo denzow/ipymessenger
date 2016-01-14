@@ -68,15 +68,28 @@ def IpmsgHostinfoListParser(hostlist_str):
 
 
 def IpmsgHostinfoParser(normal_message_inst):
+    print("DEBUG", normal_message_inst, normal_message_inst.message.__repr__())
     #user_name, host_name, command, addr, port, nick_name, group):
+
+    nick_name = None
+    group_name = None
+    splited_message = normal_message_inst.message.split("\00")
+    if len(splited_message) > 1:
+        nick_name = splited_message[0]
+        group_name = splited_message[1]
+    elif len(splited_message) == 1:
+        nick_name = splited_message[0]
+
+
+
     info = IpmsgHostinfo(
         normal_message_inst.username,
         normal_message_inst.hostname,
         normal_message_inst.command,
         normal_message_inst.addr,
         normal_message_inst.port,
-        normal_message_inst.username, #TODO username = nickname ? but normal message have one name.
-        None
+        nick_name,
+        group_name
     )
     return info
 

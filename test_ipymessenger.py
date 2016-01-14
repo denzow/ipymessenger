@@ -31,12 +31,18 @@ if __name__ == "__main__":
 
         print(ip.sended_que)
         """
-        test_no = ip.send_message_by_osusername("Administrator", "へろー by name")
-        time.sleep(5)
-        print("######test_no is success:" + str(ip.check_sended_message(test_no)))
-        print(ip.get_message("192.168.26.189"))
-        time.sleep(10)
-        print(ip.get_message("192.168.26.189"))
+        #test_no = ip.send_message_by_osusername("Administrator", "へろー by name")
+        #time.sleep(5)
+        #print("######test_no is success:" + str(ip.check_sended_message(test_no)))
+        #print(ip.get_message("192.168.26.189"))
+        #time.sleep(10)
+        #print(ip.get_message("192.168.26.189"))
+        print("#"*20)
+        for x in ip.host_list_dict:
+            print(1,x)
+            print(2,ip.host_list_dict[x].addr)
+            print(3,ip.host_list_dict[x].user_name)
+
         time.sleep(100)
 
     except Exception as e:

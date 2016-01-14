@@ -303,14 +303,10 @@ class IpmsgServer(threading.Thread):
         """
         ret = None
         for host_info in self.host_list_dict.values():
-            print( username , host_info.user_name)
             if username in host_info.user_name:
                 ret = host_info
 
         return ret
-
-
-
 
     def set_sendmsg_handler(self, function):
         """
@@ -350,7 +346,6 @@ class IpmsgServer(threading.Thread):
 
         return matched_received_list
 
-
     #########################
     # ACTION LIST
     #########################
@@ -380,8 +375,11 @@ class IpmsgServer(threading.Thread):
 
         # BR_ENTRYとANSENTRYが同時の場合はほかのユーザが
         # ネットワークに参加したときに発生する
-        if ip_msg.is_br_entry() and not ip_msg.is_ansentry():
-            self.br_entry_with_ansentry_action(ip_msg)
+        if ip_msg.is_br_entry():
+            if not ip_msg.is_ansentry():
+                self.br_entry_action(ip_msg)
+            if ip_msg.is_ansentry() and not ip_msg.is_okgetlist():
+                self.br_entry_with_ansentry_action(ip_msg)
 
         # okgetlist message have getlist flag too.
         # OKGETLISTはホストリスト返答可能フラグ
@@ -403,7 +401,7 @@ class IpmsgServer(threading.Thread):
 
         # TODO こっちで登録したホストはニックネーム化けてるときがある
         # とりあえず受信したメッセージの送信元はホストリストにいれとく
-        self._add_host_list(IpmsgHostinfoParser(ip_msg))
+        #self._add_host_list(IpmsgHostinfoParser(ip_msg))
 
     def default_action(self, msg):
         """
@@ -469,7 +467,7 @@ class IpmsgServer(threading.Thread):
         for host in host_list:
             self._add_host_list(host)
 
-    def br_entry_with_ansentry_action(self, msg):
+    def br_entry_action(self, msg):
         """
         BR_ENTRYを受け取ったらANSENTRYを戻して相手に自分を伝える。
         さらに送信元を自分のホストリストに追加する
@@ -482,6 +480,19 @@ class IpmsgServer(threading.Thread):
         ip_msg.set_flag(c.IPMSG_ANSENTRY)
         logger.debug("br_entry_re:" + ip_msg.get_full_message().__repr__())
         self._send(ip_msg)
+        # ホストリストへ追加
+        self._add_host_list(IpmsgHostinfoParser(msg))
+
+    def br_entry_with_ansentry_action(self, msg):
+        """
+        BR_ENTRYとANSENTRYがあるなら、それはこちらのBR_ENTRYへの
+        返答。送信元をを自分のホストリストに追加する
+        :param msg: 受信メッセージ
+        :return:
+        """
+        logger.debug("br_entry_with_ans:" + msg.get_full_message().__repr__())
+        # ホストリストへ追加
+        self._add_host_list(IpmsgHostinfoParser(msg))
 
     def sendmsg_action(self, msg):
         """
