@@ -24,31 +24,49 @@ handler.setLevel(DEBUG)
 class IpmsgServer(threading.Thread):
 
     src_host = "0.0.0.0"
-    # TODO
-    sended_que_life_time = 100
-    received_que_life_time = 100
 
     def __init__(self, user_name, group_name="", use_port=2524, opt_debug_handler=None,
-                 sended_que_life_time=100, received_que_life_time = 100):
+                 sended_que_life_time=100, received_que_life_time=100, broad_cast_addrs=None):
         """
-        IPMSGを管理するメインクラス。
+        IPメッセンジャーを送受信するメインクラス
+        スレッドで動作する
 
-        :param user_name: for send message and hostlist
-        :param group_name: for hostlist
-        :param use_port: listening port
-        :param opt_debug_handler: debug messages's handler
-        :return:
+
+        :param user_name: 他のユーザに表示されるユーザ名
+        :param group_name: 他のユーザに表示されるグループ名
+        :param use_port: リスニングポート、送信時にも使用される
+        :param opt_debug_handler: デバッグメッセージを書き出す場合にはlogging.StreamHandler等を渡す
+        :param sended_que_life_time: 送信済メッセージがいつまでキューに保持されるか(秒)
+        :param received_que_life_time: 受信メッセージがいつまでキューに保持されるか(秒)
+        :param broad_cast_addrs: 255.255.255.255以外でブロードキャストパケットを送信するアドレス
+                                 別セグメント等がいる場合は指定する
+        :return: なし
         """
+
         super(IpmsgServer, self).__init__()
+
+        self.use_port = use_port
+        self.user_name = user_name
+        self.group_name = group_name
 
         if opt_debug_handler:
             logger.addHandler(opt_debug_handler)
             logger.setLevel(DEBUG)
 
+        self.sended_que_life_time = sended_que_life_time
+        self.received_que_life_time = received_que_life_time
+        # broadcast
+        self.broad_cast_addrs = [
+            "255.255.255.255"
+        ]
+        # 任意のブロードキャスト先を追加
+        if broad_cast_addrs:
+            if isinstance(broad_cast_addrs, list):
+                self.broad_cast_addrs = self.broad_cast_addrs + broad_cast_addrs
+            else:
+                self.broad_cast_addrs.append(broad_cast_addrs)
+
         self.stop_event = threading.Event()
-        self.use_port = use_port
-        self.user_name = user_name
-        self.group_name = group_name
         # デフォルトのSENDMSGに対するハンドラはなにもしない
         self._sendmsg_handler = lambda x: None
 
@@ -69,7 +87,6 @@ class IpmsgServer(threading.Thread):
         # sendmsgで受け取ったキュー
         # 受信箱
         self.received_que = deque()
-
 
         # メンバーリストはニックネームをキーとする
         # {
@@ -142,6 +159,7 @@ class IpmsgServer(threading.Thread):
     def is_valid(self):
         """
         サーバが起動しているかを確認する
+        ソケットが有効かどうかで判断
         :return:
         """
         sock_name = None
@@ -151,7 +169,6 @@ class IpmsgServer(threading.Thread):
             pass
 
         return sock_name is not None
-
 
     def stop(self):
         """
@@ -247,27 +264,31 @@ class IpmsgServer(threading.Thread):
     def get_hostinfo_by_nickname(self, nickname):
         """
         指定されたニックネームのホスト情報を戻す
-        :param nickname:
-        :return:
+        :param nickname: 情報を取得したいニックネーム
+        :return: IpmsgHostinfoインスタンス or None
         """
         return self.host_list_dict.get(nickname, None)
 
     def set_sendmsg_handler(self, function):
         """
-        IPMSG_SENDMSG(他のホストからのメッセージ受信)のメッセージが届いた歳の
+        IPMSG_SENDMSG(他のホストからのメッセージ受信)のメッセージが届いた時の
         処理関数を登録する
-        :param function:
-        :return:
+        :param function: IpmsgMessageを取る関数
+        :return: 無し
         """
         self._sendmsg_handler = function
 
     def get_message(self, from_addr, num=1, remove=False):
         """
-        受信メッセージを取り出す
-        :param from_addr:
-        :param num:
-        :param remove:
-        :return:
+        送信元アドレス指定で受信メッセージを取り出す。デフォルトでは1通のみ
+        取り出す。またデフォルトでは取り出してもメッセージはキューに残る
+
+        封書の場合は取り出した時点で開封通知が相手に届く
+
+        :param from_addr: 取得したいメッセージの送信元アドレス
+        :param num: 何通取り出すか。指定数未満のメッセージしない場合でもある限り取得する
+        :param remove: 取得したメッセージをキューから削除するか(default=false)
+        :return: IpmsgMessageインスタンスのリスト
         """
         matched_received_list = [msg for msg in self.received_que if msg.addr == from_addr][0:num]
 
@@ -293,7 +314,7 @@ class IpmsgServer(threading.Thread):
     def dispatch_action(self, ip_msg):
         """
         メッセージのcommandに応じてアクションに割りあてる
-        :param ip_msg:
+        :param ip_msg: 受信メッセージ
         :return:
         """
         logger.debug("from[%s:%s]" % (ip_msg.addr, ip_msg.port))
@@ -344,7 +365,7 @@ class IpmsgServer(threading.Thread):
     def default_action(self, msg):
         """
         デバッグ用です
-        :param msg:
+        :param msg: 受信メッセージ
         :return:
         """
         logger.debug("default:" + msg.get_full_unicode_message().__repr__())
@@ -370,7 +391,7 @@ class IpmsgServer(threading.Thread):
         他ホストから送信されるもの。
         (たしか)なにもしなくてよかったはず・・・
 
-        :param msg:
+        :param msg: 受信メッセージ
         :return:
         """
         pass
@@ -380,7 +401,7 @@ class IpmsgServer(threading.Thread):
         """
         OKGETLISTを受け取ったら、相手にGETLISTを投げてホストリストを
         要求する
-        :param msg:
+        :param msg: 受信メッセージ
         :return:
         """
         # add hostlist
@@ -396,7 +417,7 @@ class IpmsgServer(threading.Thread):
         """
         GETLISTを受け取ったら、ホストリストを解釈し登録する
 
-        :param msg:
+        :param msg: 受信メッセージ
         :return:
         """
         #logger.debug("getlist:" + msg.get_full_message().__repr__())
@@ -409,7 +430,7 @@ class IpmsgServer(threading.Thread):
         """
         BR_ENTRYを受け取ったらANSENTRYを戻して相手に自分を伝える。
         さらに送信元を自分のホストリストに追加する
-        :param msg:
+        :param msg: 受信メッセージ
         :return:
         """
         logger.debug("br_entry:" + msg.get_full_message().__repr__())
@@ -423,7 +444,7 @@ class IpmsgServer(threading.Thread):
         """
         ほかのホストからメッセージを受け取ったときのアクション
         RECVMSGは無視
-        :param msg:
+        :param msg: 受信メッセージ
         :return:
         """
         logger.debug("sendmsg:" + msg.get_full_unicode_message())
@@ -442,7 +463,7 @@ class IpmsgServer(threading.Thread):
     def br_exit_action(self, msg):
         """
         BR_EXITを受け取ったら送信ホストをホストリストから削除する
-        :param msg:
+        :param msg: 受信メッセージ
         :return:
         """
         logger.debug("br_exit:" + msg.get_full_message().__repr__())
@@ -468,20 +489,21 @@ class IpmsgServer(threading.Thread):
         #send_msg = "1:%s:sayamada:B1308-66-01:%d:sayamada\00sayamada_group\00" % (self.get_packet_no(), command)
         send_msg = "%s\00%s" % (self.user_name, self.group_name)
 
-        ip_msg = IpmsgMessage("255.255.255.255", self.use_port, send_msg, self._get_packet_no(), self.user_name)
-        ip_msg.set_flag(c.IPMSG_BR_ENTRY)
-        # todo 任意のアドレスにもブロードキャストできるべき
-        self._send(ip_msg)
+        for broad_addr in self.broad_cast_addrs:
+            ip_msg = IpmsgMessage(broad_addr, self.use_port, send_msg, self._get_packet_no(), self.user_name)
+            ip_msg.set_flag(c.IPMSG_BR_ENTRY)
+            self._send(ip_msg)
 
     def _request_host_list(self):
         """
-        IPMSG_BR_ISGETLIST2を送信しホストリストを送ってくれるを探す
+        IPMSG_BR_ISGETLIST2を送信しホストリストを送ってくれる相手を探す
         :return:
         """
         #1:801798212:root:falcon:6291480:(\00)
-        ip_msg = IpmsgMessage("255.255.255.255", self.use_port, "", self._get_packet_no(), self.user_name)
-        ip_msg.set_flag(c.IPMSG_BR_ISGETLIST2)
-        self._send(ip_msg)
+        for broad_addr in self.broad_cast_addrs:
+            ip_msg = IpmsgMessage(broad_addr, self.use_port, "", self._get_packet_no(), self.user_name)
+            ip_msg.set_flag(c.IPMSG_BR_ISGETLIST2)
+            self._send(ip_msg)
 
     def _get_packet_no(self):
         """
@@ -511,7 +533,11 @@ class IpmsgServer(threading.Thread):
 
     def _cleanup_ques(self):
         """
-        だいぶ古い送信完了確認キューを待機する
+        life_timeに基づき以下のキューから削除を行う
+
+        * 送信済キュー
+        * 受信キュー
+
         :return:
         """
 
