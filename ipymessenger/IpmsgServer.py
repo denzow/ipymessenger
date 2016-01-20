@@ -185,6 +185,7 @@ class IpmsgServer(threading.Thread):
         メッセージを送信する。実際は送信待ちキューへの追加
         :param to_addr:送信先アドレス
         :param msg:送るメッセージの文字列
+        :param is_secret: 封書として送るか
         :return:送信完了追跡用のパケット番号
         """
         # Ver(1) : Packet No : MyUserName : MyHostName : Command : Extra
@@ -206,6 +207,7 @@ class IpmsgServer(threading.Thread):
         ユーザリストのニックネーム指定でメッセージを送信する
         :param nickname:  送信対象のユーザ名
         :param msg: 送るメッセージの文字列
+        :param is_secret: 封書として送るか
         :return: 送信完了追跡用のパケット番号
         """
         # Ver(1) : Packet No : MyUserName : MyHostName : Command : Extra
@@ -223,6 +225,7 @@ class IpmsgServer(threading.Thread):
         ただしユーザ名は空白違いなどをある程度無視できる
         :param nickname:  送信対象のユーザ名
         :param msg: 送るメッセージの文字列
+        :param is_secret: 封書として送るか
         :return: 送信完了追跡用のパケット番号
         """
         # Ver(1) : Packet No : MyUserName : MyHostName : Command : Extra
@@ -252,6 +255,7 @@ class IpmsgServer(threading.Thread):
         ユーザリストのニックネーム指定でメッセージを送信する
         :param username:  送信対象のユーザ名
         :param msg: 送るメッセージの文字列
+        :param is_secret: 封書として送るか
         :return: 送信完了追跡用のパケット番号
         """
         # Ver(1) : Packet No : MyUserName : MyHostName : Command : Extra
@@ -596,7 +600,7 @@ class IpmsgServer(threading.Thread):
         """
         self.packet_no += 1
         # msg is not int. so packet_no must be str too.
-        return unicode(self.packet_no)
+        return self.packet_no.decode("utf-8")
 
     def _send(self, ip_msg):
         """
