@@ -288,7 +288,6 @@ class IpmsgServer(threading.Thread):
         return not ((packet_no in [x.packet_no for x in self.wait_read_que]) or (packet_no in [x.packet_no for x in self.sended_que]))
 
 
-
     def get_hostinfo_by_nickname(self, nickname):
         """
         指定されたニックネームのホスト情報を戻す
@@ -313,6 +312,19 @@ class IpmsgServer(threading.Thread):
             if username in host_info.user_name:
                 ret = host_info
 
+        return ret
+
+    def get_hostinfo_by_addr(self, addr, port):
+        """
+        指定されたアドレスのホスト情報を戻す
+        :param addr: 対象IPアドレス
+        :param port: 対象ポート
+        :return: IpmsgHostinfoインスタンス or None
+        """
+        ret = None
+        for host_info in self.host_list_dict.values():
+            if addr == host_info.addr and port == host_info.port:
+                ret = host_info
         return ret
 
     def set_sendmsg_handler(self, function):
@@ -352,6 +364,7 @@ class IpmsgServer(threading.Thread):
                 self._send(ip_msg)
 
         return matched_received_list
+
 
     #########################
     # ACTION LIST
@@ -600,7 +613,7 @@ class IpmsgServer(threading.Thread):
         """
         self.packet_no += 1
         # msg is not int. so packet_no must be str too.
-        return self.packet_no.decode("utf-8")
+        return str(self.packet_no)
 
     def _send(self, ip_msg):
         """
