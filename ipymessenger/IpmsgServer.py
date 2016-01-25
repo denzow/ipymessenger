@@ -44,6 +44,7 @@ class IpmsgServer(threading.Thread):
         """
 
         super(IpmsgServer, self).__init__()
+        self.daemon = True
 
         self.use_port = use_port
         self.user_name = user_name
@@ -102,6 +103,7 @@ class IpmsgServer(threading.Thread):
         self._entry()
         # ほかのメンバーにホストリストをリクエストする
         self._request_host_list()
+
 
     def run(self):
         """
@@ -286,7 +288,6 @@ class IpmsgServer(threading.Thread):
         """
         # 送信後キューと開封まちキューの両方から消えていれば送信は完了
         return not ((packet_no in [x.packet_no for x in self.wait_read_que]) or (packet_no in [x.packet_no for x in self.sended_que]))
-
 
     def get_hostinfo_by_nickname(self, nickname):
         """
@@ -479,8 +480,7 @@ class IpmsgServer(threading.Thread):
         # add hostlist
         #logger.debug("okgetlist:" + msg.get_full_message())
         # "1:100:sender:sender-pc:18:0"
-
-        ip_msg = IpmsgMessage(msg.addr, msg.port, "", self._get_packet_no(), self.user_name)
+        ip_msg = IpmsgMessage(msg.addr, msg.port, str(0), self._get_packet_no(), self.user_name)
         ip_msg.set_flag(c.IPMSG_GETLIST)
         self._send(ip_msg)
 
@@ -494,9 +494,25 @@ class IpmsgServer(threading.Thread):
         """
         #logger.debug("getlist:" + msg.get_full_message().__repr__())
         logger.debug("getlist")
-        begin_no, host_count, host_list = IpmsgHostinfoListParser(msg.get_full_unicode_message())
-        for host in host_list:
-            self._add_host_list(host)
+        try:
+            begin_no, host_count, host_list = IpmsgHostinfoListParser(msg.message)
+            for host in host_list:
+                self._add_host_list(host)
+
+            # TODO wip
+            # 残りのホスト要求
+            # host_countが0でなければ続きを依頼し、0になるまで依頼する
+            # continus flagがよくわからない・・・
+            if host_count != 0:
+                # begin_no + host_count
+                ip_msg = IpmsgMessage(msg.addr, msg.port, str(1), self._get_packet_no(), self.user_name)
+                ip_msg.set_flag(c.IPMSG_GETLIST)
+                logger.debug("getlist_more:" + ip_msg.get_full_message().__repr__())
+                self._send(ip_msg)
+
+        except ValueError as e:
+            logger.debug("parse hostlist error")
+            logger.debug(e.message)
 
     def br_entry_action(self, msg):
         """

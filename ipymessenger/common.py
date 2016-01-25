@@ -46,7 +46,7 @@ def guess_charset(data):
         data.decode("CP932")
         return "CP932"
     except:
-        return "utf-8"
+        return "shift-jis"
 
 
 def adjust_name(base_name_str, join_str):

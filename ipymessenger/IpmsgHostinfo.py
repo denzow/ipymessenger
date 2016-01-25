@@ -57,10 +57,12 @@ def IpmsgHostinfoListParser(hostlist_str):
     denzow\x07B1308-66-01\x070\x07192.168.24.97\x0741482\x07denzow\x07ymsft_group\x07
     \x00
     """
+    # print(hostlist_str.__repr__())
     host_list = []
     splited_host_list = hostlist_str.split("\07")
-    begein_no = splited_host_list[0]
-    host_count = splited_host_list[1]
+    begein_no = int(splited_host_list[0].strip())
+    host_count = int(splited_host_list[1].strip())
+    # ホストリスト毎に分割(7要素で1ペア)
     for x in zip(*[iter(splited_host_list[2:])]*7):
         host_list.append(IpmsgHostinfo(*x))
 
