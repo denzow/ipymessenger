@@ -135,7 +135,7 @@ class IpmsgServer(threading.Thread):
                         send_msg = self.send_que.popleft()
                         logger.debug("To[%s:%s]" % (send_msg.addr, send_msg.port))
                         [logger.debug("\t"+x) for x in send_msg.check_flag()]
-                        logger.debug(send_msg.get_full_message())
+                        logger.debug(send_msg.get_full_unicode_message())
                         # 指定アドレスにメッセージを投げる
                         self.sock.sendto(send_msg.get_full_message(), (send_msg.addr, send_msg.port))
 
@@ -503,12 +503,12 @@ class IpmsgServer(threading.Thread):
             # 残りのホスト要求
             # host_countが0でなければ続きを依頼し、0になるまで依頼する
             # continus flagがよくわからない・・・
-            if host_count != 0:
-                # begin_no + host_count
-                ip_msg = IpmsgMessage(msg.addr, msg.port, str(1), self._get_packet_no(), self.user_name)
-                ip_msg.set_flag(c.IPMSG_GETLIST)
-                logger.debug("getlist_more:" + ip_msg.get_full_message().__repr__())
-                self._send(ip_msg)
+            #if host_count != 0:
+            #    # begin_no + host_count
+            #    ip_msg = IpmsgMessage(msg.addr, msg.port, str(1), self._get_packet_no(), self.user_name)
+            #    ip_msg.set_flag(c.IPMSG_GETLIST)
+            #    logger.debug("getlist_more:" + ip_msg.get_full_message().__repr__())
+            #    self._send(ip_msg)
 
         except ValueError as e:
             logger.debug("parse hostlist error")

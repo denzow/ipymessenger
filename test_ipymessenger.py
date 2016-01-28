@@ -21,7 +21,7 @@ if __name__ == "__main__":
         ip.start()
         time.sleep(5)
 
-        hello_no = ip.send_message(dest_host, "へろー", is_secret=True)
+        hello_no = ip.send_message(dest_host, "⑫", is_secret=True)
         time.sleep(3)
         print("######hello send success:" + str(ip.check_sended_message(hello_no)))
         print("######hello is_read?:" + str(ip.check_readed_message(hello_no)))

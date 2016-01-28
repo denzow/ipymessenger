@@ -27,6 +27,7 @@ class IpmsgMessage(object):
 
         # TODO
         self.encode = "sjis"
+        self.sub_encode = "cp932"
         # for manage limit dead
         self.born_time = None
 
@@ -40,7 +41,10 @@ class IpmsgMessage(object):
             self.command,
             self.message
         )
-        return ret_msg.encode(self.encode)
+        try:
+            return ret_msg.encode(self.encode)
+        except UnicodeEncodeError:
+            return ret_msg.encode(self.sub_encode)
 
     def get_full_unicode_message(self):
         # Ver(1) : Packet No : MyUserName : MyHostName : Command : msg
