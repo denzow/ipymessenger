@@ -82,8 +82,6 @@ def IpmsgHostinfoParser(normal_message_inst):
     elif len(splited_message) == 1:
         nick_name = splited_message[0]
 
-
-
     info = IpmsgHostinfo(
         normal_message_inst.username,
         normal_message_inst.hostname,

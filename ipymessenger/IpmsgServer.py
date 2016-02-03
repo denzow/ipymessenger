@@ -102,8 +102,8 @@ class IpmsgServer(threading.Thread):
         # ネットワークにブロードキャストして参加を通知する
         self._entry()
         # ほかのメンバーにホストリストをリクエストする
+        self._last_get_listed_time = None
         self._request_host_list()
-
 
     def run(self):
         """
@@ -147,6 +147,11 @@ class IpmsgServer(threading.Thread):
                             self.sended_que.append(send_msg)
                 # メッセージキューのメンテナンス
                 self._cleanup_ques()
+
+                # ホストリストの更新が60秒前なら再度行う
+                if (datetime.datetime.now() - self._last_get_listed_time) > datetime.timedelta(seconds=60):
+                    self._request_host_list()
+
         except IndentationError as e:
             error_args = sys.exc_info()
             logger.debug(traceback.print_tb(error_args[2]))
@@ -616,6 +621,8 @@ class IpmsgServer(threading.Thread):
         IPMSG_BR_ISGETLIST2を送信しホストリストを送ってくれる相手を探す
         :return:
         """
+        # 実行日を保持
+        self._last_get_listed_time = datetime.datetime.now()
         #1:801798212:root:falcon:6291480:(\00)
         for broad_addr in self.broad_cast_addrs:
             ip_msg = IpmsgMessage(broad_addr, self.use_port, "", self._get_packet_no(), self.user_name)

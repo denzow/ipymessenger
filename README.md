@@ -1,10 +1,14 @@
 # ipymessenger
 
 Pythonで[IP messenger](http://ipmsg.org/) を使うためのライブラリです。
-そのうちPyPIにも登録したいですがまだです。
-
 ライブりとして組み込んで使用することを想定しています。
 
+
+## インストール方法
+
+```
+pip install ipymessenger
+```
 
 ## 関数の説明
 
@@ -112,6 +116,5 @@ else:
 
 ## TODO
 
-* send SECRET message
 * register hostinfo correctry other than via getlist
 * remove hostlist when rcv br_exit.

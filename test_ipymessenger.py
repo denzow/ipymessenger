@@ -27,7 +27,8 @@ if __name__ == "__main__":
         print("######hello is_read?:" + str(ip.check_readed_message(hello_no)))
         time.sleep(5)
         print("######hello is_read?:" + str(ip.check_readed_message(hello_no)))
-
+        for x in ip.host_list_dict:
+            print(x, ip.host_list_dict[x].group)
 
         """
         test_no = ip.send_message_by_fuzzy_nickname("slope  太郎", "へろー by name", is_secret=True)
