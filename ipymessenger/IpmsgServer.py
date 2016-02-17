@@ -26,7 +26,7 @@ class IpmsgServer(threading.Thread):
     src_host = "0.0.0.0"
 
     def __init__(self, user_name, group_name="", use_port=2524, opt_debug_handler=None,
-                 sended_que_life_time=6000, received_que_life_time=6000, wait_read_que_life_time=6000, broad_cast_addrs=None):
+                 sended_que_life_time=6000, received_que_life_time=6000, wait_read_que_life_time=6000, request_info_interval=60,broad_cast_addrs=None):
         """
         IPメッセンジャーを送受信するメインクラス
         スレッドで動作する
@@ -57,6 +57,7 @@ class IpmsgServer(threading.Thread):
         self.sended_que_life_time = sended_que_life_time
         self.received_que_life_time = received_que_life_time
         self.wait_read_que_life_time = wait_read_que_life_time
+        self.request_info_interval = request_info_interval
         # broadcast
         self.broad_cast_addrs = [
             "255.255.255.255"
@@ -149,7 +150,8 @@ class IpmsgServer(threading.Thread):
                 self._cleanup_ques()
 
                 # ホストリストの更新が60秒前なら再度行う
-                if (datetime.datetime.now() - self._last_get_listed_time) > datetime.timedelta(seconds=60):
+                if (datetime.datetime.now() - self._last_get_listed_time) > datetime.timedelta(seconds=self.request_info_interval):
+                    logger.debug("request_host_list because timed out[%s][%s]" % (datetime.datetime.now(),self._last_get_listed_time))
                     self._request_host_list()
 
         except IndentationError as e:

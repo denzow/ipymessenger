@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding:utf-8
+from __future__ import print_function, unicode_literals
 
 import re
 
@@ -14,7 +15,7 @@ def to_unicode(string):
     :return:
     """
     encode = guess_charset(string)
-    # print encode, string
+    # print(encode, string)
     try:
         return string.decode(encode)
     except UnicodeDecodeError:

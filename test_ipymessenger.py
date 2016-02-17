@@ -13,14 +13,15 @@ if __name__ == "__main__":
     dest_host = "192.168.26.189"
     # デバッグメッセージが必要な場合はloggingのHandlerを渡す
     #ip = IpmsgServer("sayamada", "ymsft_group", 2722, StreamHandler(), broad_cast_addrs=["172.16.25.0"])
-    ip = IpmsgServer("sayamada", "ymsft_group", 2722, StreamHandler(), broad_cast_addrs=["172.16.25.0"])
+    ip = IpmsgServer("sayamada", "ymsft_group", 2722, StreamHandler(), broad_cast_addrs=["172.16.25.0"], request_info_interval=20)
     #ip.set_sendmsg_handler(lambda x: x.message.rstrip("\00")+"ADD BY HANDLER")
     #ip = IpmsgServer("sayamada", "ymsft_group", 2722)
     try:
         #ip.set_sendmsg_handler(lambda x:print(x))
         ip.start()
-        time.sleep(5)
+        time.sleep(60)
 
+        """
         hello_no = ip.send_message(dest_host, "⑫", is_secret=True)
         time.sleep(3)
         print("######hello send success:" + str(ip.check_sended_message(hello_no)))
@@ -30,7 +31,6 @@ if __name__ == "__main__":
         for x in ip.host_list_dict:
             print(x, ip.host_list_dict[x].group)
 
-        """
         test_no = ip.send_message_by_fuzzy_nickname("slope  太郎", "へろー by name", is_secret=True)
         time.sleep(5)
         print("######test_no is success:" + str(ip.check_sended_message(test_no)))

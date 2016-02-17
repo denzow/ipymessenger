@@ -166,7 +166,7 @@ def IpmsgMessageParser(addr, port, msg_str):
     username = attr_list[2]
     hostname = attr_list[3]
     command = attr_list[4]
-    message = attr_list[5]
+    message = ":".join(attr_list[5:])
 
     return IpmsgMessage(
         addr,
